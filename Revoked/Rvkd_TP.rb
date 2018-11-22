@@ -27,8 +27,8 @@ class Game_BattlerBase
     make_tp_attrs
   end
 
-  attr_accessor :tp_exceed
-  attr_accessor :tp_rise
+  attr_accessor :tp_exceed  # TP above the default maximum
+  attr_accessor :tp_rise    # Initial TP in battle
 
   def make_tp_attrs
     @base_tp = nil
@@ -36,21 +36,18 @@ class Game_BattlerBase
     @tp_rise = 0
   end
 
+  # Checks for battler's specified base TP.
   def base_mtp
     return @base_tp if @base_tp
-
     if self.is_a?(Game_Actor)
       @base_tp = $1.to_i if self.actor.note =~ /<base_tp:[ ](\d+)>/i
     elsif self.is_a?(Game_Enemy)
       @base_tp = $1.to_i if self.enemy.note =~ /<base_tp:[ ](\d+)>/i
     end
-
     @base_tp ||= Revoked::Actor::BASE_TP
   end
 
-  def display_current_tp
-    @tp_rise
-  end
+  def display_current_tp; @tp_rise end
 
 end
 
