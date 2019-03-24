@@ -1,3 +1,5 @@
 Rvkd_Menu
 Rvkd_Msg_SE
 Rvkd_TP
+Rvkd_CustomStats
+Rvkd_Scene_Equip

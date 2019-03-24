@@ -37,6 +37,7 @@ module Revoked
     FONT_DARK = Color.new(24,24,24,255)
     FONT_FADE = Color.new(48,48,48,48)
     FONT_SMALL = 21
+    FONT_MINI = 18
     FONT_MEDIUM = 28
     FONT_LEVEL = 36
     FONT_LARGE = 70
@@ -65,6 +66,15 @@ module Cache
     load_bitmap("Graphics/Menus/", filename)
   end
 end
+
+class Window
+
+  def back_opacity ; 255 end
+
+  def opacity ; 255 end
+
+end
+
 
 #=============================================================================
 # ■ Scene_Menu

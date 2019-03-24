@@ -170,7 +170,7 @@ class Game_BattlerBase
     if buff_level > 0
       return ICON_BUFF_START + (buff_level - 1) * 8 + param_id
     elsif buff_level < 0
-      return ICON_DEBUFF_START + (-buff_level - 1) * 8 + param_id 
+      return ICON_DEBUFF_START + (-buff_level - 1) * 8 + param_id
     else
       return 0
     end
