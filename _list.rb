@@ -4,6 +4,6 @@ Sprites/
 Windows/
 Scenes/
 Bug Fixes/
-Revoked/
 Materials/
+Revoked/
 Main Process/

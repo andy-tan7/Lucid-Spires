@@ -37,7 +37,7 @@ module Revoked
     FONT_DARK = Color.new(24,24,24,255)
     FONT_FADE = Color.new(48,48,48,48)
     FONT_SMALL = 21
-    FONT_MINI = 18
+    FONT_MENULIST = 20
     FONT_MEDIUM = 28
     FONT_LEVEL = 36
     FONT_LARGE = 70
@@ -208,7 +208,6 @@ class Window_MenuCommand < Window_Command
   end
 
   def dispose_selector
-    p("disposed_selector")
     @@selector.dispose
     @@selector = nil
   end
@@ -412,6 +411,7 @@ class Window_MenuTabText < Window_Base
     contents.font.size = Revoked::Menu::FONT_MEDIUM
     contents.font.name = Revoked::Menu::FONT_NAME
     contents.font.outline = false
+    contents.font.shadow = false
     contents.font.color = Revoked::Menu::FONT_LIGHT
     rx = Revoked::Menu::TAB[:pad]
     rw = Revoked::Menu::TAB[:width]
@@ -495,6 +495,7 @@ class Window_MenuTabSplash < Window_Base
     contents.font.size = Revoked::Menu::FONT_LARGE
     contents.font.name = Revoked::Menu::FONT_NAME
     contents.font.outline = false
+    contents.font.shadow = false
     contents.font.color = Revoked::Menu::FONT_FADE
     contents.font.color.alpha = @text_opacity
     contents.draw_text(0,0, contents.width, contents.height, @text.upcase, 2)
@@ -533,6 +534,7 @@ class Window_MenuTabDesc < Window_Base
     contents.font.size = Revoked::Menu::FONT_SMALL
     contents.font.name = Revoked::Menu::FONT_NAME
     contents.font.outline = false
+    contents.font.shadow = false
     contents.font.color = Revoked::Menu::FONT_DARK
     set_desc(index)
   end
@@ -620,6 +622,7 @@ class Window_PlayTime < Window_Base
     contents.font.size = Revoked::Menu::FONT_SMALL
     contents.font.name = Revoked::Menu::FONT_NAME
     contents.font.outline = false
+    contents.font.shadow = false
     contents.font.color = Revoked::Menu::FONT_DARK
     refresh
   end
@@ -654,6 +657,7 @@ class Window_Gold < Window_Base
     contents.font.size = Revoked::Menu::FONT_SMALL
     contents.font.name = Revoked::Menu::FONT_NAME
     contents.font.outline = false
+    contents.font.shadow = false
     contents.font.color = Revoked::Menu::FONT_DARK
     refresh
   end
@@ -683,6 +687,7 @@ class Window_MenuMapName < Window_Base
     contents.font.size = Revoked::Menu::FONT_SMALL
     contents.font.name = Revoked::Menu::FONT_NAME
     contents.font.outline = false
+    contents.font.shadow = false
     contents.font.color = Revoked::Menu::FONT_DARK
     refresh
   end
@@ -770,8 +775,10 @@ class Window_MenuStatus < Window_Selectable
   #overwrite: draw_actor_level
   def draw_actor_level(actor, x, y)
     contents.font.outline = false
+    contents.font.shadow = false
     contents.font.name = Revoked::Menu::FONT_NAME
     contents.font.color = Revoked::Menu::FONT_DARK
+    contents.font.color.alpha = 150
     contents.font.size = Revoked::Menu::FONT_SMALL
     draw_text(x, y, 32, 24, "LV", 1)
     contents.font.size = Revoked::Menu::FONT_LEVEL

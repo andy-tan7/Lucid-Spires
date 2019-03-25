@@ -17,6 +17,7 @@ class Game_BattlerBase
   end
 
   def bparam_plus(bparam_id)
+    # TODO: bparam plus values
     return 0#@bparam_plus[bparam_id]
   end
 
@@ -43,9 +44,11 @@ class Game_BattlerBase
     value *= bparam_rate(bparam_id) + bparam_buff_rate(bparam_id)
     [[value, bparam_max(bparam_id)].min, bparam_min(bparam_id)].max.to_i
   end
-
 end
 
+#=============================================================================
+# ■ Game_Actor
+#=============================================================================
 class Game_Actor < Game_Battler
 
   def bparam_base(bparam_id)
@@ -57,7 +60,9 @@ class Game_Actor < Game_Battler
   end
 end
 
-
+#=============================================================================
+# ■ module DataManager
+#=============================================================================
 class << DataManager
   alias rvkd_custom_stats_load_db load_database
   def load_database
@@ -72,7 +77,9 @@ class << DataManager
   end
 end
 
-
+#=============================================================================
+# ■ RPG::Actor
+#=============================================================================
 class RPG::Actor < RPG::BaseItem
   attr_reader :base_bparam
   attr_reader :growth_bparam
@@ -84,8 +91,8 @@ class RPG::Actor < RPG::BaseItem
   # end
 
   def load_bparam_notetags
-    @base_bparam = [5] * 3
-    @growth_bparam = [0.4] * 3
+    @base_bparam = [6,6,5]
+    @growth_bparam = [0.4,0.3,0.5]
     self.note.split(/[\r\n]+/).each do |line|
       if line =~ /<base[ _]bparams[:?]\s*(\d+),?[\s?](\d+),?[\s?](\d+)>/i
         @base_bparam[0] = $1.to_i
@@ -98,9 +105,8 @@ class RPG::Actor < RPG::BaseItem
         @growth_bparam[2] = $3.to_i
       end
     end
-    puts(2)
-    puts(@base_param)
-    puts(@growth_param)
+    puts(@base_bparam)
+    puts(@growth_bparam)
   end
 
 end
