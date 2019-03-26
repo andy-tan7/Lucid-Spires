@@ -22,27 +22,66 @@ module Revoked
     STAT_NAME_SHADOW = false
     STAT_NAME_OUTLINE = false
 
-    STAT_VALUE_COLOR = Color.new(255,255,255,255)
+    STAT_VALUE_COLOR = FONT_LIGHT #Color.new(255,255,255,255)
     STAT_VALUE_SHADOW = false
-    STAT_VALUE_OUTLINE = true
+    STAT_VALUE_OUTLINE = false
 
     module Equip
       HP_BAR = {:bar_x  => 74, :bar_y  => 18, #EquipCharacter card
                 :fill_x => 75, :fill_y => 19,
                 :diam_x => 76, :diam_y => 7,
-                :text_x => 6,  :text_y => 5}
+                :text_x => -4,  :text_y => 3}
 
       MP_BAR = {:bar_x  => 74, :bar_y  => 37, #EquipCharacter card
                 :fill_x => 75, :fill_y => 38,
                 :diam_x => 76, :diam_y => 26,
-                :text_x => 6,  :text_y => 24}
+                :text_x => -4,  :text_y => 22}
 
       TP_BAR = {:ary_x => 74, :ary_y => 49, :offset_x => 14}
+
+      FACE_NAME = "menu64face"
+      ITEM_WIDTH = 32
     end
 
   end
 end
 
+class Game_Actor < Game_Battler
+
+  #override: equip_slots
+  def equip_slots
+    return [0,0,2,3,5,4,4] if dual_wield?
+    return [0,1,2,3,5,4,4]
+  end
+
+end
+
+class RPG::Armor < RPG::EquipItem
+
+  def load_rvkd_etype_notetags
+    self.note.split(/[\r\n]+/).each do |line|
+      @etype_id = $1.to_i if line=~ /<\w*[ _]?type[:?][\s]?(\d+)>/i
+    end
+  end
+
+end
+
+#=============================================================================
+# ■ module DataManager
+#=============================================================================
+class << DataManager
+  alias rvkd_custom_equip_types_load_db load_database
+  def load_database
+    rvkd_custom_equip_types_load_db
+    load_custom_equip_types
+  end
+
+  def load_custom_equip_types
+    ($data_armors).compact.each do |item|
+      item.load_rvkd_etype_notetags
+    end
+  end
+end
 
 #=============================================================================
 # ■ Scene_Equip
@@ -56,8 +95,11 @@ class Scene_Equip < Scene_MenuBase
     rvkd_custom_sceq_start
     create_attribute_window
     create_character_window
-    @command_window.x = 0
-    @command_window.y = 0
+    create_preview_window
+    command_equip
+    @help_window.x = 64
+    @help_window.y = 372
+    @help_window.opacity = 24
   end
 
   alias rvkd_custom_sceq_command_clear command_clear
@@ -65,6 +107,7 @@ class Scene_Equip < Scene_MenuBase
     rvkd_custom_sceq_command_clear
     @attribute_window.refresh
     @character_window.refresh
+    @preview_window.refresh
   end
 
   alias rvkd_custom_sceq_command_optimize command_optimize
@@ -72,6 +115,7 @@ class Scene_Equip < Scene_MenuBase
     rvkd_custom_sceq_command_optimize
     @attribute_window.refresh
     @character_window.refresh
+    @preview_window.refresh
   end
 
   alias rvkd_custom_sceq_on_item_ok on_item_ok
@@ -79,13 +123,28 @@ class Scene_Equip < Scene_MenuBase
     rvkd_custom_sceq_on_item_ok
     @attribute_window.refresh
     @character_window.refresh
+    @preview_window.refresh
   end
 
-  alias rvkd_custom_sceq_on_actor_change on_actor_change
+  #override: on_actor_change -- remove command_window func
+  #alias rvkd_custom_sceq_on_actor_change on_actor_change
   def on_actor_change
+    @status_window.actor = @actor
+    @slot_window.actor = @actor
+    @item_window.actor = @actor
     @attribute_window.actor = @actor
     @character_window.actor = @actor
-    rvkd_custom_sceq_on_actor_change
+    @preview_window.actor = @actor
+    @slot_window.activate
+  end
+
+  #override: create_command_window -- do nothing
+  def create_command_window
+  end
+
+  #override: on_slot_cancel
+  def on_slot_cancel
+    return_scene
   end
 
   #overwrite: create_background
@@ -119,15 +178,24 @@ class Scene_Equip < Scene_MenuBase
     @character_window.actor = @actor
   end
 
+  def create_preview_window
+    @preview_window = Window_EquipPreview.new(256,64)
+    @preview_window.viewport = @viewport
+    @preview_window.actor = @actor
+  end
+
   #overwrite: create_slot_window
   def create_slot_window
     @slot_window = Window_EquipSlot.new(48,144,198)
     @slot_window.viewport = @viewport
     @slot_window.help_window = @help_window
     @slot_window.status_window = @status_window
+    @slot_window.attribute_window = @attribute_window
     @slot_window.actor = @actor
     @slot_window.set_handler(:ok,     method(:on_slot_ok))
     @slot_window.set_handler(:cancel, method(:on_slot_cancel))
+    @slot_window.set_handler(:pagedown, method(:next_actor))
+    @slot_window.set_handler(:pageup,   method(:prev_actor))
   end
 
   #overwrite: create_item_window
@@ -141,6 +209,14 @@ class Scene_Equip < Scene_MenuBase
     @item_window.set_handler(:ok,     method(:on_item_ok))
     @item_window.set_handler(:cancel, method(:on_item_cancel))
     @slot_window.item_window = @item_window
+  end
+
+  #alias: dispose_all_windows
+  alias rvkd_custom_sceq_dispose_all_windows dispose_all_windows
+  def dispose_all_windows
+    rvkd_custom_sceq_dispose_all_windows
+    @character_window.dispose_sprites
+    #@preview_window.dispose_sprites
   end
 
 end
@@ -158,13 +234,46 @@ class Window_EquipSlot < Window_Selectable
   end
 
   def window_height ; 198 end
+  def standard_padding ; 8 end
+  def line_height ; 26 end
 
-  alias rvkd_custom_sceq_window_equipslot_draw_item draw_item
+  #override: draw_item(index)
+  #alias rvkd_custom_sceq_window_equipslot_draw_item draw_item
   def draw_item(index)
-    contents.font.size = Revoked::Menu::FONT_MENULIST
+    return unless @actor
+    contents.font.size = Revoked::Menu::FONT_SMALL
     contents.font.name = Revoked::Menu::FONT_NAME
-    rvkd_custom_sceq_window_equipslot_draw_item(index)
+    contents.font.color = Revoked::Menu::FONT_BROWN
+    contents.font.color.alpha = 128
+    contents.font.shadow = false
+    contents.font.outline = false
+    rect = item_rect_for_text(index)
+    draw_text(rect.x + 22, rect.y, 92, line_height, ":")
+    draw_icon(Revoked::Menu::EQUIP_SLOT_ICON[index], rect.x - 3, rect.y)
+    draw_item_name(@actor.equips[index], rect.x + 28, rect.y, enable?(index))
   end
+
+  #override: draw_item_name -- change colors, nil handling
+  def draw_item_name(item, x, y, enabled = true, width = 172)
+    contents.font.size = Revoked::Menu::FONT_MENULIST
+    contents.font.color = Revoked::Menu::FONT_LIGHT
+    contents.font.outline = false
+    contents.font.shadow = false
+    if item
+      draw_icon(item.icon_index, x, y+1, enabled)
+      draw_text(x + 25, y, width, line_height, item.name)
+    else
+      contents.font.color.alpha = 128
+      draw_text(x + 4, y, width, line_height, "------")
+    end
+  end
+  # def item_width
+  #   Revoked::Menu::Equip::ITEM_WIDTH
+  # end
+
+  def visible_line_number ; 7 end
+
+
 end
 
 #=============================================================================
@@ -178,6 +287,26 @@ class Window_EquipItem < Window_ItemList
   def attribute_window=(attribute_window)
     @attribute_window = attribute_window
   end
+
+  def standard_padding ; 7 end
+  def line_height ; 25 end
+  def col_max ; 1 end
+
+  #override: draw_item(index)
+  def draw_item_name(item, x, y, enabled = true, width = 172)
+    contents.font.size = Revoked::Menu::FONT_MENULIST
+    contents.font.color = Revoked::Menu::FONT_LIGHT
+    contents.font.outline = false
+    contents.font.shadow = false
+    if item
+      draw_icon(item.icon_index, x, y+1, enabled)
+      draw_text(x + 25, y, width, line_height, item.name)
+    else
+      contents.font.color.alpha = 128
+      draw_text(x + 4, y, width, line_height, "------")
+    end
+  end
+
 end
 
 #=============================================================================
@@ -190,8 +319,7 @@ class Window_EquipStatus < Window_Base
     contents.clear
     contents.font.size = Revoked::Menu::FONT_MENULIST
     contents.font.name = Revoked::Menu::FONT_NAME
-    [2,3].each {|i| draw_param(0, line_height * (i-2), i)}
-    [4,5].each {|i| draw_param(0, line_height * (i-2), i)}
+    [2,4,3,5].each_with_index {|s,i| draw_param(0, line_height * i, s)}
     3.times {|i| draw_xparam(0, 4 + line_height * (i+4), i)}
   end
 
@@ -291,6 +419,30 @@ class Window_EquipAttribute < Window_EquipStatus
 
 end
 
+class Window_EquipPreview < Window_Base
+
+  def initialize(x,y)
+    super(x, y, window_width, window_height)
+    @actor = nil
+    @character_sprite = nil
+  end
+
+  def window_width ; 166 end
+  def window_height ; 154 end
+  def standard_padding ; 3 end
+
+  def actor=(actor)
+    return if @actor == actor
+    @actor = actor
+    refresh
+  end
+
+  def refresh
+  end
+
+
+end
+
 #=============================================================================
 # ■ Window_EquipCharacter (new)
 #-----------------------------------------------------------------------------
@@ -302,10 +454,12 @@ class Window_EquipCharacter < Window_Base
     super(x, y, window_width, window_height)
     @actor = nil
     @character_card = nil
+    self.back_opacity = 0
   end
 
   def window_width ; 198 end
   def window_height ; 70 end
+  def standard_padding ; 3 end
 
   def actor=(actor)
     return if @actor == actor
@@ -318,12 +472,63 @@ class Window_EquipCharacter < Window_Base
     if @character_card
       @character_card.refresh
     else
-      @character_card = RvkdEquip_CharacterCard.new(@viewport,@actor,self.x,self.y)
+      cc = RvkdEquip_CharacterCard.new(@viewport,@actor,self.x,self.y)
+      @character_card = cc
     end
+    draw_status if @actor
+  end
+
+  def dispose_sprites
+    @character_card.dispose
+  end
+
+  def draw_status
+    bar_x = Revoked::Menu::Equip::HP_BAR[:bar_x]
+    draw_actor_hp(bar_x, Revoked::Menu::Equip::HP_BAR[:bar_y])
+    draw_actor_mp(bar_x, Revoked::Menu::Equip::MP_BAR[:bar_y])
+    draw_actor_face(@actor, 0, 0)
+  end
+
+  def draw_actor_hp(x,y,width = Revoked::Menu::STATUS[:bar_width])
+    self.z = 800
+    contents.font.outline = true
+    contents.font.size = Revoked::Menu::FONT_SMALL
+    contents.font.name = Revoked::Menu::FONT_NAME
+    contents.font.color = hp_color(@actor)
+    text_x = Revoked::Menu::Equip::HP_BAR[:text_x]
+    text_y = Revoked::Menu::Equip::HP_BAR[:text_y]
+    draw_text(x + text_x, text_y, width, line_height, "#{@actor.hp}", 2)
+  end
+
+  def draw_actor_mp(x,y,width = Revoked::Menu::STATUS[:bar_width])
+    self.z = 800
+    contents.font.outline = true
+    contents.font.size = Revoked::Menu::FONT_SMALL
+    contents.font.name = Revoked::Menu::FONT_NAME
+    contents.font.color = mp_color(@actor)
+    text_x = Revoked::Menu::Equip::MP_BAR[:text_x]
+    text_y = Revoked::Menu::Equip::MP_BAR[:text_y]
+    draw_text(x + text_x, text_y, width, line_height, "#{@actor.mp}", 2)
+  end
+
+  #override: draw_face (to stretch)
+  def draw_face(face_name, face_index, x, y, enabled = true)
+    face_name = Revoked::Menu::Equip::FACE_NAME
+    bitmap = Cache.face(face_name)
+    rect = Rect.new(face_index % 4 * 96, face_index / 4 * 96, 96, 96)
+    #drect = Rect.new(0, 0, 64, 64)
+    contents.blt(x,y, bitmap, rect, enabled ? 255 : translucent_alpha)
+    bitmap.dispose
   end
 
 end
 
+
+#=============================================================================
+# ■ RvkdEquip_CharacterCard (new)
+#-----------------------------------------------------------------------------
+# Equipment menu character card
+#=============================================================================
 class RvkdEquip_CharacterCard < Sprite
 
   def initialize(viewport,actor,x,y)
@@ -331,16 +536,18 @@ class RvkdEquip_CharacterCard < Sprite
     self.x = x
     self.y = y
     @actor = actor
-    make_hp
-    make_mp
-    make_tp
+    make_sprites
+  end
+
+  def actor=(actor)
+    return if @actor == actor
+    @actor = actor
+    refresh
   end
 
   def refresh
     clear_sprites
-    make_hp
-    make_mp
-    make_tp
+    make_sprites
   end
 
   def make_hp
@@ -348,19 +555,19 @@ class RvkdEquip_CharacterCard < Sprite
     @hp_bar.bitmap = Cache.menus("Menu_HPBar")
     @hp_bar.x = self.x + Revoked::Menu::Equip::HP_BAR[:bar_x]
     @hp_bar.y = self.y + Revoked::Menu::Equip::HP_BAR[:bar_y]
-    @hp_bar.z = 220
+    @hp_bar.z = 120
 
     @hp_diamond = Sprite.new(@viewport)
     @hp_diamond.bitmap = Cache.menus("Menu_HPDiamond")
     @hp_diamond.x = self.x + Revoked::Menu::Equip::HP_BAR[:diam_x]
     @hp_diamond.y = self.y + Revoked::Menu::Equip::HP_BAR[:diam_y]
-    @hp_diamond.z = 222
+    @hp_diamond.z = 122
 
     @hp_fill = RvkdMenu_StatBar.new(@viewport, :hp, @actor)
     @hp_fill.bitmap = Cache.menus("Menu_HPFill")
     @hp_fill.x = self.x + Revoked::Menu::Equip::HP_BAR[:fill_x]
     @hp_fill.y = self.y + Revoked::Menu::Equip::HP_BAR[:fill_y]
-    @hp_fill.z = 221
+    @hp_fill.z = 121
   end
 
   def make_mp
@@ -368,19 +575,19 @@ class RvkdEquip_CharacterCard < Sprite
     @mp_bar.bitmap = Cache.menus("Menu_MPBar")
     @mp_bar.x = self.x + Revoked::Menu::Equip::MP_BAR[:bar_x]
     @mp_bar.y = self.y + Revoked::Menu::Equip::MP_BAR[:bar_y]
-    @mp_bar.z = 220
+    @mp_bar.z = 120
 
     @mp_diamond = Sprite.new(@viewport)
     @mp_diamond.bitmap = Cache.menus("Menu_MPDiamond")
     @mp_diamond.x = self.x + Revoked::Menu::Equip::MP_BAR[:diam_x]
     @mp_diamond.y = self.y + Revoked::Menu::Equip::MP_BAR[:diam_y]
-    @mp_diamond.z = 222
+    @mp_diamond.z = 122
 
     @mp_fill = RvkdMenu_StatBar.new(@viewport, :mp, @actor)
     @mp_fill.bitmap = Cache.menus("Menu_MPFill")
     @mp_fill.x = self.x + Revoked::Menu::Equip::MP_BAR[:fill_x]
     @mp_fill.y = self.y + Revoked::Menu::Equip::MP_BAR[:fill_y]
-    @mp_fill.z = 221
+    @mp_fill.z = 121
   end
 
   def make_tp
@@ -405,6 +612,12 @@ class RvkdEquip_CharacterCard < Sprite
   def dispose
     clear_sprites
     rvkd_custom_sceq_sprite_dispose
+  end
+
+  def make_sprites
+    make_hp
+    make_mp
+    make_tp
   end
 
   def clear_sprites

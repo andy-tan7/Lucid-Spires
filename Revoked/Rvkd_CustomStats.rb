@@ -105,8 +105,8 @@ class RPG::Actor < RPG::BaseItem
         @growth_bparam[2] = $3.to_i
       end
     end
-    puts(@base_bparam)
-    puts(@growth_bparam)
+    #puts(@base_bparam)
+    #puts(@growth_bparam)
   end
 
 end

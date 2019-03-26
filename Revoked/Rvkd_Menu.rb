@@ -35,9 +35,12 @@ module Revoked
     FONT_NAME = "EB Garamond 08 Standard Digit"
     FONT_LIGHT = Color.new(100,85,75,255)
     FONT_DARK = Color.new(24,24,24,255)
+    FONT_BROWN = Color.new(56,48,40,255)
+
     FONT_FADE = Color.new(48,48,48,48)
     FONT_SMALL = 21
     FONT_MENULIST = 20
+    FONT_REGULAR = 24
     FONT_MEDIUM = 28
     FONT_LEVEL = 36
     FONT_LARGE = 70
@@ -983,6 +986,7 @@ class RvkdMenu_StatBar < Sprite
   end
 
   def stat_ratio
+    return 1 unless @actor
     case @symbol
     when :hp; return @actor.hp_rate
     when :mp; return @actor.mp_rate
