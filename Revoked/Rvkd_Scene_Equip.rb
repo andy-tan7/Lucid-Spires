@@ -18,13 +18,16 @@ end
 module Revoked
   module Menu
     EQUIP_SLOT_ICON = [147,161,164,170,174,177,177]
-    STAT_NAME_COLOR = FONT_LIGHT
+    STAT_NAME_COLOR = FONT_BROWN
     STAT_NAME_SHADOW = false
     STAT_NAME_OUTLINE = false
 
-    STAT_VALUE_COLOR = FONT_LIGHT #Color.new(255,255,255,255)
+    STAT_VALUE_COLOR = FONT_BROWN #Color.new(255,255,255,255)
     STAT_VALUE_SHADOW = false
     STAT_VALUE_OUTLINE = false
+
+    COLOR_POWER_UP = Color.new(0,160,96,255)
+    COLOR_POWER_DOWN = Color.new(192,0,12,255)
 
     module Equip
       HP_BAR = {:bar_x  => 74, :bar_y  => 18, #EquipCharacter card
@@ -41,6 +44,14 @@ module Revoked
 
       FACE_NAME = "menu64face"
       ITEM_WIDTH = 32
+
+      ELEM_ICONS = [96,97,98,99,100,101,102,103,104]
+      ELEM_POS = [[18,26],[50,10],[86,10],[118,26],
+                  [18,98],[50,114],[86,114],[118,98]]
+      ELEM_ID = [3,4,5,6,7,8,9,10]
+
+      ICON_UP = 528
+      ICON_DOWN = 529
     end
 
   end
@@ -222,12 +233,38 @@ class Scene_Equip < Scene_MenuBase
 end
 
 #=============================================================================
+# ■ Window
+#-----------------------------------------------------------------------------
+# Aliased window methods.
+#=============================================================================
+class Window_Base < Window
+
+  alias rvkd_custom_scm_window_background_panel dispose
+  def dispose
+    rvkd_custom_scm_window_background_panel
+    @panel.dispose if @panel
+  end
+
+  def power_up_color; Revoked::Menu::COLOR_POWER_UP end
+  def power_down_color; Revoked::Menu::COLOR_POWER_DOWN end
+
+end
+#=============================================================================
 # ■ Window_EquipSlot
 #-----------------------------------------------------------------------------
 # Equipment slot window.
 #=============================================================================
 class Window_EquipSlot < Window_Selectable
   attr_reader :attribute_window
+
+  alias rvkd_custom_sceq_window_equipslot_initialize initialize
+  def initialize(x, y, width)
+    rvkd_custom_sceq_window_equipslot_initialize(x, y, width)
+    @panel = RvkdMenu_WindowPanel.new(self.x, self.y, 198, 198, @viewport)
+    self.back_opacity = 0
+  end
+
+
 
   def attribute_window=(attribute_window)
     @attribute_window = attribute_window
@@ -248,15 +285,15 @@ class Window_EquipSlot < Window_Selectable
     contents.font.shadow = false
     contents.font.outline = false
     rect = item_rect_for_text(index)
-    draw_text(rect.x + 22, rect.y, 92, line_height, ":")
-    draw_icon(Revoked::Menu::EQUIP_SLOT_ICON[index], rect.x - 3, rect.y)
+    #draw_text(rect.x + 22, rect.y, 92, line_height, ":")
+    #draw_icon(Revoked::Menu::EQUIP_SLOT_ICON[index], rect.x - 3, rect.y)
     draw_item_name(@actor.equips[index], rect.x + 28, rect.y, enable?(index))
   end
 
   #override: draw_item_name -- change colors, nil handling
   def draw_item_name(item, x, y, enabled = true, width = 172)
     contents.font.size = Revoked::Menu::FONT_MENULIST
-    contents.font.color = Revoked::Menu::FONT_LIGHT
+    contents.font.color = Revoked::Menu::FONT_BROWN
     contents.font.outline = false
     contents.font.shadow = false
     if item
@@ -283,6 +320,13 @@ end
 #=============================================================================
 class Window_EquipItem < Window_ItemList
   attr_reader :attribute_window
+
+  alias rvkd_custom_sceq_window_equipitem_initialize initialize
+  def initialize(x, y, width, height)
+    rvkd_custom_sceq_window_equipitem_initialize(x, y, width, height)
+    @panel = RvkdMenu_WindowPanel.new(self.x, self.y, 166, 114, @viewport, true)
+    self.back_opacity = 0
+  end
 
   def attribute_window=(attribute_window)
     @attribute_window = attribute_window
@@ -315,6 +359,16 @@ end
 # Equipment combat stat window (atk, def, spb, res, acc, eva, cri)
 #=============================================================================
 class Window_EquipStatus < Window_Base
+
+  alias rvkd_custom_sceq_window_equipstatus_initialize initialize
+  def initialize(x, y)
+    rvkd_custom_sceq_window_equipstatus_initialize(x, y)
+    if self.class == Window_EquipStatus
+      @panel = RvkdMenu_WindowPanel.new(self.x, self.y, 166, 154, @viewport)
+    end
+    self.back_opacity = 0
+  end
+
   def refresh
     contents.clear
     contents.font.size = Revoked::Menu::FONT_MENULIST
@@ -331,7 +385,7 @@ class Window_EquipStatus < Window_Base
   # params: atk, def, spb, mdef
   def draw_param(x, y, param_id)
     draw_param_name(x + 4, y, param_id)
-    draw_current_param(x + 112, y, param_id) if @actor
+    draw_current_param(x + 80, y, param_id) if @actor
   end
 
   def draw_param_name(x, y, param_id)
@@ -345,7 +399,21 @@ class Window_EquipStatus < Window_Base
     contents.font.color = Revoked::Menu::STAT_VALUE_COLOR
     contents.font.shadow =  Revoked::Menu::STAT_VALUE_SHADOW
     contents.font.outline = Revoked::Menu::STAT_VALUE_OUTLINE
-    draw_text(x, y, 32, line_height, @actor.param(param_id), 2)
+    cur = @actor.param(param_id)
+    change = @temp_actor.param(param_id) if @temp_actor
+    if change && cur != change
+      w = text_size(change).width + 20
+      icon_index = Revoked::Menu::Equip::ICON_UP if cur < change
+      icon_index = Revoked::Menu::Equip::ICON_DOWN if cur > change
+      draw_icon(icon_index, x - w + 62, y - 2)
+      change_color(param_change_color(cur - change))
+      draw_text(x - w, y, 64, line_height, cur, 2)
+      change_color(param_change_color(change - cur))
+      text = change
+    else
+      text = cur
+    end
+    draw_text(x, y, 64, line_height, text, 2)
   end
 
   # xparams: accuracy, evasion, critical
@@ -379,6 +447,8 @@ class Window_EquipAttribute < Window_EquipStatus
 
   def initialize(x, y)
     super(x, y)
+    @panel = RvkdMenu_WindowPanel.new(self.x, self.y, 166, 114, @viewport)
+    self.back_opacity = 0
   end
 
   def window_width ; 166 end
@@ -419,17 +489,26 @@ class Window_EquipAttribute < Window_EquipStatus
 
 end
 
+#=============================================================================
+# ■ Window_EquipPreview (new)
+#-----------------------------------------------------------------------------
+# Equipment character preview (element symbols)
+#=============================================================================
 class Window_EquipPreview < Window_Base
 
   def initialize(x,y)
     super(x, y, window_width, window_height)
+    @panel = RvkdMenu_WindowPanel.new(self.x, self.y, 166, 154, @viewport)
     @actor = nil
     @character_sprite = nil
+    self.back_opacity = 0
+    make_platform
   end
 
   def window_width ; 166 end
   def window_height ; 154 end
   def standard_padding ; 3 end
+  def translucent_alpha ; 128 end
 
   def actor=(actor)
     return if @actor == actor
@@ -437,9 +516,41 @@ class Window_EquipPreview < Window_Base
     refresh
   end
 
-  def refresh
+  alias rvkd_custom_sceq_window_equippreview_dispose dispose
+  def dispose
+    rvkd_custom_sceq_window_equippreview_dispose
+    @character_sprite.dispose if @character_sprite
+    @platform.dispose if @platform
   end
 
+  def refresh
+    contents.clear
+    draw_element_icons(@actor)
+    update_actor_sprite
+  end
+
+  def make_platform
+    @platform = Sprite.new(@viewport)
+    @platform.bitmap = Cache.menus("preview_diamond")
+    @platform.x = self.x
+    @platform.y = self.y
+    @platform.z = 92
+  end
+
+  def update_actor_sprite
+    # check counter
+  end
+
+  def draw_element_icons(actor)
+    8.times do |index|
+      icon_x = Revoked::Menu::Equip::ELEM_POS[index][0]
+      icon_y = Revoked::Menu::Equip::ELEM_POS[index][1]
+      icon_index = Revoked::Menu::Equip::ELEM_ICONS[index]
+      element_rate = Revoked::Menu::Equip::ELEM_ID[index]
+      modified = actor.element_rate(element_rate) != 1.0
+      draw_icon(icon_index, icon_x, icon_y, modified)
+    end
+  end
 
 end
 
@@ -452,6 +563,7 @@ class Window_EquipCharacter < Window_Base
 
   def initialize(x,y)
     super(x, y, window_width, window_height)
+    @panel = RvkdMenu_WindowPanel.new(self.x, self.y, 198, 70, @viewport)
     @actor = nil
     @character_card = nil
     self.back_opacity = 0
@@ -628,6 +740,41 @@ class RvkdEquip_CharacterCard < Sprite
     @mp_fill.dispose
     @mp_diamond.dispose
     @tp_diamonds.each {|diamond| diamond.dispose}
+  end
+
+end
+
+#=============================================================================
+# ■ RvkdMenu_WindowPanel (new)
+#-----------------------------------------------------------------------------
+# Menu background panels.
+#=============================================================================
+class RvkdMenu_WindowPanel < Sprite
+
+  def initialize(x, y, width, height, viewport, lines = false)
+    @background = Sprite.new(viewport)
+    @background.x = x
+    @background.y = y
+    @background.z = 90
+    @background.bitmap = Cache.menus("Win_#{width}x#{height}")
+    if lines
+      @lines = Sprite.new(viewport)
+      @lines.x = x
+      @lines.y = y
+      @lines.z = 96
+      @lines.bitmap = Cache.menus("Lin_#{width}x#{height}")
+    end
+  end
+
+  alias rvkd_custom_window_panel_sprite_dispose dispose
+  def dispose
+    clear_sprites
+    rvkd_custom_window_panel_sprite_dispose
+  end
+
+  def clear_sprites
+    @background.dispose
+    @lines.dispose if @lines
   end
 
 end
