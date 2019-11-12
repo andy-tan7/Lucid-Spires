@@ -40,8 +40,9 @@ class Game_BattlerBase
   end
 
   def bparam(bparam_id)
+    puts(param_buff_rate(bparam_id))
     value = bparam_base(bparam_id) + bparam_plus(bparam_id)
-    value *= bparam_rate(bparam_id) + bparam_buff_rate(bparam_id)
+    value *= bparam_rate(bparam_id) * bparam_buff_rate(bparam_id)
     [[value, bparam_max(bparam_id)].min, bparam_min(bparam_id)].max.to_i
   end
 end
@@ -53,6 +54,10 @@ class Game_Actor < Game_Battler
 
   def bparam_base(bparam_id)
     self.actor.base_bparam[bparam_id] + bparam_growth(bparam_id, level).floor
+  end
+
+  def bparam_plus(bparam_id)
+    equips.compact.inject(super) {|r, item| r += item.bparams[bparam_id] }
   end
 
   def bparam_growth(bparam_id, level)
@@ -71,7 +76,7 @@ class << DataManager
   end
 
   def load_custom_stats
-    ($data_actors).compact.each do |item|
+    ([$data_actors, $data_weapons, $data_armors].flatten).compact.each do |item|
       item.load_bparam_notetags
     end
   end
@@ -111,6 +116,24 @@ class RPG::Actor < RPG::BaseItem
 
 end
 
+class RPG::EquipItem
+  attr_accessor :bparams
+
+  def load_bparam_notetags
+    @bparams = [0,0,0]
+    self.note.split(/[\r\n]+/).each do |line|
+      if line =~ /<bparams[:?]\s*(\d+),?[\s?](\d+),?[\s?](\d+)>/i
+        @bparams[0] = $1.to_i
+        @bparams[1] = $2.to_i
+        @bparams[2] = $3.to_i
+      end
+      @bparams[0] = $1.to_i if line =~ /<might:[ ](\d+)>/i
+      @bparams[1] = $2.to_i if line =~ /<arcana:[ ](\d+)>/i
+      @bparams[2] = $3.to_i if line =~ /<might:[ ](\d+)>/i
+    end
+  end
+
+end
 # class Game_BattlerBase
 #
 #   #overwrite: changed max from 8 to 11.

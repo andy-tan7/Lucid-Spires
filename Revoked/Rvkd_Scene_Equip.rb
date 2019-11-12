@@ -1,4 +1,4 @@
-
+# encoding: utf-8
 module Vocab
   XPARAM = ["Accuracy",
             "Evasion",
@@ -26,32 +26,33 @@ module Revoked
     STAT_VALUE_SHADOW = false
     STAT_VALUE_OUTLINE = false
 
-    COLOR_POWER_UP = Color.new(0,160,96,255)
+    COLOR_POWER_UP = Color.new(0,144,80,255)
     COLOR_POWER_DOWN = Color.new(192,0,12,255)
 
     module Equip
       HP_BAR = {:bar_x  => 74, :bar_y  => 18, #EquipCharacter card
                 :fill_x => 75, :fill_y => 19,
                 :diam_x => 76, :diam_y => 7,
-                :text_x => -4,  :text_y => 3}
+                :text_x => -4, :text_y => 3}
 
       MP_BAR = {:bar_x  => 74, :bar_y  => 37, #EquipCharacter card
                 :fill_x => 75, :fill_y => 38,
                 :diam_x => 76, :diam_y => 26,
-                :text_x => -4,  :text_y => 22}
+                :text_x => -4, :text_y => 22}
 
       TP_BAR = {:ary_x => 74, :ary_y => 49, :offset_x => 14}
 
       FACE_NAME = "menu64face"
       ITEM_WIDTH = 32
 
-      ELEM_ICONS = [96,97,98,99,100,101,102,103,104]
+      ELEM_ICONS = [96,99,101,100,100,98,97,103,104]
       ELEM_POS = [[18,26],[50,10],[86,10],[118,26],
                   [18,98],[50,114],[86,114],[118,98]]
       ELEM_ID = [3,4,5,6,7,8,9,10]
 
-      ICON_UP = 528
-      ICON_DOWN = 529
+      ICON_UP = 530
+      ICON_DOWN = 531
+      ICON_ARROW = 530
     end
 
   end
@@ -180,6 +181,8 @@ class Scene_Equip < Scene_MenuBase
     @attribute_window = Window_EquipAttribute.new(432, 228)
     @attribute_window.viewport = @viewport
     @attribute_window.actor = @actor
+    @slot_window.attribute_window = @attribute_window
+    @item_window.attribute_window = @attribute_window
   end
 
   #new: create_character_window
@@ -201,7 +204,6 @@ class Scene_Equip < Scene_MenuBase
     @slot_window.viewport = @viewport
     @slot_window.help_window = @help_window
     @slot_window.status_window = @status_window
-    @slot_window.attribute_window = @attribute_window
     @slot_window.actor = @actor
     @slot_window.set_handler(:ok,     method(:on_slot_ok))
     @slot_window.set_handler(:cancel, method(:on_slot_cancel))
@@ -215,7 +217,6 @@ class Scene_Equip < Scene_MenuBase
     @item_window.viewport = @viewport
     @item_window.help_window = @help_window
     @item_window.status_window = @status_window
-    @item_window.attribute_window = @attribute_window
     @item_window.actor = @actor
     @item_window.set_handler(:ok,     method(:on_item_ok))
     @item_window.set_handler(:cancel, method(:on_item_cancel))
@@ -273,6 +274,7 @@ class Window_EquipSlot < Window_Selectable
   def window_height ; 198 end
   def standard_padding ; 8 end
   def line_height ; 26 end
+  def visible_line_number ; 7 end
 
   #override: draw_item(index)
   #alias rvkd_custom_sceq_window_equipslot_draw_item draw_item
@@ -304,11 +306,13 @@ class Window_EquipSlot < Window_Selectable
       draw_text(x + 4, y, width, line_height, "------")
     end
   end
-  # def item_width
-  #   Revoked::Menu::Equip::ITEM_WIDTH
-  # end
 
-  def visible_line_number ; 7 end
+  alias rvkd_custom_sceq_window_equipslot_update_help update_help
+  def update_help
+    rvkd_custom_sceq_window_equipslot_update_help
+    @attribute_window.set_temp_actor(nil) if @attribute_window
+    p("called")
+  end
 
 
 end
@@ -330,6 +334,7 @@ class Window_EquipItem < Window_ItemList
 
   def attribute_window=(attribute_window)
     @attribute_window = attribute_window
+    call_update_help
   end
 
   def standard_padding ; 7 end
@@ -348,6 +353,16 @@ class Window_EquipItem < Window_ItemList
     else
       contents.font.color.alpha = 128
       draw_text(x + 4, y, width, line_height, "------")
+    end
+  end
+
+  alias rvkd_custom_sceq_window_equipitem_update_help update_help
+  def update_help
+    rvkd_custom_sceq_window_equipitem_update_help
+    if @actor && @attribute_window
+      temp_actor = Marshal.load(Marshal.dump(@actor))
+      temp_actor.force_change_equip(@slot_id, item)
+      @attribute_window.set_temp_actor(temp_actor)
     end
   end
 
@@ -402,24 +417,23 @@ class Window_EquipStatus < Window_Base
     cur = @actor.param(param_id)
     change = @temp_actor.param(param_id) if @temp_actor
     if change && cur != change
-      w = text_size(change).width + 20
       icon_index = Revoked::Menu::Equip::ICON_UP if cur < change
       icon_index = Revoked::Menu::Equip::ICON_DOWN if cur > change
-      draw_icon(icon_index, x - w + 62, y - 2)
-      change_color(param_change_color(cur - change))
-      draw_text(x - w, y, 64, line_height, cur, 2)
+      draw_icon(icon_index, x + 24, y - 3)
+      draw_text(x - 42, y, 64, line_height, "#{cur}", 2)
       change_color(param_change_color(change - cur))
       text = change
     else
       text = cur
     end
+    contents.font.size = Revoked::Menu::FONT_MENULIST
     draw_text(x, y, 64, line_height, text, 2)
   end
 
   # xparams: accuracy, evasion, critical
   def draw_xparam(x, y, xparam_id)
     draw_xparam_name(x + 4, y, xparam_id)
-    draw_current_xparam(x + 112, y, xparam_id) if @actor
+    draw_current_xparam(x + 80, y, xparam_id) if @actor
   end
 
   def draw_xparam_name(x, y, xparam_id)
@@ -433,7 +447,20 @@ class Window_EquipStatus < Window_Base
     contents.font.color = Revoked::Menu::STAT_VALUE_COLOR
     contents.font.shadow =  Revoked::Menu::STAT_VALUE_SHADOW
     contents.font.outline = Revoked::Menu::STAT_VALUE_OUTLINE
-    draw_text(x, y, 32, line_height, "#{(@actor.xparam(xparam_id)*100).to_i}",2)
+    cur = (@actor.xparam(xparam_id)*100).to_i
+    change = (@temp_actor.xparam(xparam_id)*100).to_i if @temp_actor
+    if change && cur != change
+      icon_index = Revoked::Menu::Equip::ICON_UP if cur < change
+      icon_index = Revoked::Menu::Equip::ICON_DOWN if cur > change
+      draw_icon(icon_index, x + 24, y - 2)
+      draw_text(x - 42, y, 64, line_height, cur, 2)
+      change_color(param_change_color(change - cur))
+      text = change
+    else
+      text = cur
+    end
+    contents.font.size = Revoked::Menu::FONT_MENULIST
+    draw_text(x, y, 64, line_height, text, 2)
   end
 
 end
@@ -466,7 +493,7 @@ class Window_EquipAttribute < Window_EquipStatus
   # bparams: might, arcana, vitality
   def draw_bparam(x, y, bparam_id)
     draw_bparam_name(x + 4, y, bparam_id)
-    draw_current_bparam(x + 112, y, bparam_id) if @actor
+    draw_current_bparam(x + 80, y, bparam_id) if @actor
   end
 
   def draw_bparam_name(x, y, bparam_id)
@@ -484,7 +511,20 @@ class Window_EquipAttribute < Window_EquipStatus
     # contents.font.name = Revoked::Menu::FONT_NAME
     contents.font.shadow =  Revoked::Menu::STAT_VALUE_SHADOW
     contents.font.outline = Revoked::Menu::STAT_VALUE_OUTLINE
-    draw_text(x, y, 32, line_height, @actor.bparam(bparam_id), 2)
+    cur = @actor.bparam(bparam_id)
+    change = @temp_actor.bparam(bparam_id) if @temp_actor
+    if change && cur != change
+      w = text_size(change).width + 20
+      icon_index = Revoked::Menu::Equip::ICON_UP if cur < change
+      icon_index = Revoked::Menu::Equip::ICON_DOWN if cur > change
+      draw_icon(icon_index, x + 24, y - 2)
+      draw_text(x - 42, y, 64, line_height, cur, 2)
+      change_color(param_change_color(change - cur))
+      text = change
+    else
+      text = cur
+    end
+    draw_text(x, y, 64, line_height, text, 2)
   end
 
 end
