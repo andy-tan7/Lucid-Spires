@@ -5,7 +5,7 @@
 #===========================================================================
 module Revoked
   module Menu
-    TAB = {:x     => 540, :y      => 62,    # Menu_Command Tabs
+    TAB = {:x     => 860, :y      => 62,    # Menu_Command Tabs
            :width => 92,  :height => 39,
            :pad   => 8,   :info_y => -32}
 
