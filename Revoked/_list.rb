@@ -1,6 +1,4 @@
 Rvkd_Menu
-Rvkd_GridModule
-Rvkd_HexGrid
 Rvkd_Msg_SE
 Rvkd_TP
 Rvkd_CustomStats

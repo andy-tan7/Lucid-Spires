@@ -4,10 +4,15 @@ class Scene_TestGrid < Scene_Base
   def start
     super
     @hex_grid = HexGrid.new(@viewport)
+    @counter = 0
   end
 
   def update
     super
+    @counter += 1
+    if @counter % 2000 == 1
+      p(@hex_grid.all_tiles)
+    end
   end
 
   def update_basic
@@ -22,23 +27,41 @@ class Scene_TestGrid < Scene_Base
 end
 
 class Game_Actor
+
   def original_x
     unit_x = Revoked::Grid.position(0,0)[:x]
     unit_x += Revoked::Grid::UnitXOffset
-    unit_x
+    return unit_x
   end
+
   def original_y
     unit_y = Revoked::Grid.position(0,0)[:y]
     unit_y += Revoked::Grid::UnitYOffset
-    unit_y
+    return unit_y
   end
+
+  def grid_row ; return $game_system.party_positions[@actor_id][0] end
+  def grid_col ; return $game_system.party_positions[@actor_id][1] end
+
 end
 
-#------------------------------------------------------------------------------
-# ** Game_Temp
-#==============================================================================
-class Game_Temp
-  attr_accessor :grid
+class Game_System
+
+  attr_reader :party_positions
+  alias rvkd_hexgrid_gsy_initialize initialize
+  def initialize
+    rvkd_hexgrid_gsy_initialize
+    @party_positions = Revoked::Grid::DefaultPositions
+  end
+
+  def update_party_positon(actor_id, position = [0,0])
+    if @party_positons.any?{|x| p[0] != actor_id && x[1].eql?(position) }
+      raise "Tried to update to an existing position"
+    end
+    @party_positions[actor_id] = position
+  end
+
+
 end
 
 #------------------------------------------------------------------------------
@@ -46,19 +69,20 @@ end
 #==============================================================================
 class Spriteset_Battle
 
-  alias rvkd_grid_spriteset_battle_initialize initialize
-  def initialize
-    create_grid
-    rvkd_grid_spriteset_battle_initialize
-  end
+  # alias rvkd_hexgrid_spb_initialize initialize
+  # def initialize
+  #   create_grid
+  #   rvkd_hexgrid_spb_initialize
+  # end
 
   def create_grid
-    $game_temp.grid = HexGrid.new(@viewport0)
+    @battle_grid = HexGrid.new(@viewport0)
+    return @battle_grid
   end
 
-  alias rvkd_grid_spriteset_battle_create_viewports create_viewports
+  alias rvkd_hexgrid_spb_create_viewports create_viewports
   def create_viewports
-    rvkd_grid_spriteset_battle_create_viewports
+    rvkd_hexgrid_spb_create_viewports
     @viewport0 = Viewport.new
     @viewport0.z = 0
     @viewport1.z = 25
@@ -72,14 +96,14 @@ class Spriteset_Battle
     #center_sprite(@back1_sprite)
   end
 
-  alias rvkd_grid_spriteset_battle_update_viewports update_viewports
+  alias rvkd_hexgrid_spb_update_viewports update_viewports
   def update_viewports
-    rvkd_grid_spriteset_battle_update_viewports
+    rvkd_hexgrid_spb_update_viewports
     @viewport0.update
   end
 
   def dispose_grid
-    $game_temp.grid.dispose_grid
+    @battle_grid.dispose_grid
   end
 
 end
@@ -89,25 +113,23 @@ end
 #==============================================================================
 class HexGrid
 
-  def test_m
-    if Input.repeat?(:C)
-      n = @grid[@cursor[0]][@cursor[1]].neighbours_dir([1])
-      n.each {|t| t.select_tile if t}
-    elsif Input.repeat?(:B)
-      n = @grid[@cursor[0]][@cursor[1]].neighbours_dir([2])
-      n.each {|t| t.deselect_tile if t}
-    end
-  end
+  # def test_m
+  #   if Input.repeat?(:C)
+  #     n = @grid[@cursor[0]][@cursor[1]].neighbours_dir([1])
+  #     n.each {|t| t.select_tile if t}
+  #   elsif Input.repeat?(:B)
+  #     n = @grid[@cursor[0]][@cursor[1]].neighbours_dir([2])
+  #     n.each {|t| t.deselect_tile if t}
+  #   end
+  # end
 
   def initialize(viewport)
+    p("Initializing")
     create_tiles
-    create_links
+    #create_links
     @cursor = [0,0]
     @grid[@cursor[0]][@cursor[1]].select_tile
     @viewport = viewport
-    @grid[1][1].ally_tile
-    @grid[0][1].neutral_tile
-    @grid[-1][1].enemy_tile
   end
 
   # Called by the scene every frame.
@@ -115,6 +137,14 @@ class HexGrid
     if cursor_movable?
       process_cursor_move
     end
+    # if @to_cancel
+    #   reset_tiles(all_tiles)
+    #   @to_cancel = false
+    # end
+    # if @to_dim != nil
+    #   make_dim(all_tiles - @to_dim)
+    #   @to_dim = nil
+    # end
   end
 
   # Default -------------------------------------------------------------------
@@ -126,6 +156,7 @@ class HexGrid
     # Contain the grid in a hash with int keys to put the origin (0,0) in the
     # grid center and allow for "negative indices" relative to the origin.
     @grid = {}
+    @tilelist = []
     radius_x = Revoked::Grid::RadiusX
     radius_y = Revoked::Grid::RadiusY
 
@@ -135,6 +166,7 @@ class HexGrid
       right_ind = row > 0 ? radius_x - row : radius_x
       (left_ind..right_ind).each { |col|
         @grid[row][col] = HexTile.new(col, row, @viewport)
+        @tilelist.push(@grid[row][col])
       }
     end
   end
@@ -173,12 +205,22 @@ class HexGrid
   def process_cursor_move
     return unless cursor_movable?
     last = @cursor.dup
-    test_m
+    #test_m
 
     if Input.repeat?(:UP)
-      Input.dir8 == 9 ? cursor_up(:right) : cursor_up(:left)
+      # if Input.press?(:left)
+        cursor_up(:left)
+      # elsif Input.repeat?(:right)
+      #   cursor_up(:right)
+      # end
+      #Input.dir8 == 9 ? cursor_up(:right) : cursor_up(:left)
     elsif Input.repeat?(:DOWN)
-      Input.dir8 == 1 ? cursor_down(:left) : cursor_down(:right)
+      # if Input.repeat?(:left)
+      #   cursor_down(:left)
+      # elsif Input.repeat?(:right)
+        cursor_down(:right)
+      # end
+      #Input.dir8 == 1 ? cursor_down(:left) : cursor_down(:right)
     elsif Input.repeat?(:LEFT)
       cursor_left
     elsif Input.repeat?(:RIGHT)
@@ -244,6 +286,46 @@ class HexGrid
     @cursor[1] = @cursor[1]+1 unless @grid[@cursor[0]][@cursor[1]+1].nil?
   end
 
+  # Return an array of tiles given a 2D array of coordinates. [[y,x]]
+  def tiles_from_coordinates(region = [])
+    result = []
+    region.each {|pair|
+      result.push(@grid[pair[0]][pair[1]]) if @grid[pair[0]] && @grid[pair[0]][pair[1]]
+    }
+    return result
+  end
+
+  #----------------------------------------------------------------------------
+  # Tile selection and highlighting for UI
+  #----------------------------------------------------------------------------
+  def get(row, col)
+    return @grid[row][col]
+  end
+
+  def set_origin(row, col)
+    @cursor = [row, col]
+  end
+
+  def all_tiles
+    @tilelist
+  end
+
+  def setup_target_selection(cursor_origin, available, potential = [])
+    @changed_squares = available + potential
+    make_available(available)
+    make_potential(potential)
+  end
+
+  def cancel_target_selection(reselect = nil)
+    reset_tiles(all_tiles)
+    @grid[@cursor[0]][@cursor[1]].select_tile
+  end
+
+  def make_available(tiles) ; tiles.each {|t| t.opacity_available_tile } end
+  def make_potential(tiles) ; tiles.each {|t| t.opacity_potential_tile } end
+  def make_dim(tiles) ;       tiles.each {|t| t.opacity_dim_tile } end
+  def reset_tiles(tiles)    ; tiles.each {|t| t.reset_opacity } end
+
 end # HexGrid
 
 #------------------------------------------------------------------------------
@@ -252,13 +334,16 @@ end # HexGrid
 class HexTile
 
   attr_reader :neighbours
+  attr_reader :unit_contents
   def initialize(x_index, y_index, viewport)
     @viewport = viewport
     @floor_sprite = Sprite.new(@viewport)
     @floor_sprite.bitmap = Cache.grid("htile_neutral")
+    @floor_sprite.opacity = 128
 
     @select_sprite = Sprite.new(@viewport)
     @select_sprite.bitmap = Cache.grid("htile_glow")
+    @select_sprite.opacity = 0
 
     # Place tile sprites.
     position = Revoked::Grid.position(x_index, y_index)
@@ -268,8 +353,6 @@ class HexTile
     @select_sprite.x = @floor_sprite.x
     @select_sprite.y = @floor_sprite.y
     @select_sprite.z = 0
-    @floor_sprite.opacity = 192
-    @select_sprite.opacity = 0
 
     # initialize fields
     @ind_x = x_index
@@ -277,6 +360,8 @@ class HexTile
     @selected = false
     # right, top_right, top_left, left, bottom_left, bottom_right
     @neighbours = [nil,nil,nil,nil,nil,nil]
+    # keep track of units on the tile.
+    clear_units
     refresh
   end
 
@@ -288,6 +373,7 @@ class HexTile
 
   # Free all sprites
   def dispose
+    @unit_contents.clear
     @floor_sprite.dispose
     @select_sprite.dispose
   end
@@ -312,36 +398,60 @@ class HexTile
   end
 
   # Get [x,y] hash keys for the grid
-  def coordinates
-    return [@ind_x,@ind_y]
-  end
+  def coordinates_xy ; return [@ind_x, @ind_y] end
+  def coordinates_rc ; return [@ind_y, @ind_x] end
 
-  def ally_tile
-    @floor_sprite.color.set(64,160,224,192)
-  end
+  #------------------------------\
+  # Tile colouring and appearance \--------------------------------------------
+  # Set colour to claimed scheme ----------------------------------------------
+  def ally_tile    ; @floor_sprite.color.set(64,160,224,192) end
+  def enemy_tile   ; @floor_sprite.color.set(224,128,128,192) end
+  def neutral_tile ; @floor_sprite.color.set(224,224,224,224) end
 
-  def enemy_tile
-    @floor_sprite.color.set(224,128,128,192)
-  end
-
-  def neutral_tile
-    @floor_sprite.color.set(224,224,224,192)
+  # Highlight the unit receiving a command.
+  def select_input_unit
+    select_tile
   end
 
   # Highlight graphic
   def select_tile
     @selected = true
+    @select_sprite.bitmap = Cache.grid("htile_glow")
     @select_sprite.opacity = 200
     refresh
   end
 
-  # Regular graphic
   def deselect_tile
     @selected = false
     @select_sprite.opacity = 0
     refresh
   end
 
+  # Secondary tile from main tile (i.e., area of effect radius)
+  def set_area_effect_tile
+    @selected = true
+    @select_sprite.bitmap = Cache.grid("htile_glow_s")
+    @select_sprite.opacity = 200
+    refresh
+  end
+
+  def reset_area_effect_tile
+    @selected = false
+    @select_sprite.opacity = 0
+    refresh
+  end
+
+  # Brighter to indicate that the cursor can move there.
+  def opacity_available_tile ; @floor_sprite.opacity = 200 end
+  # Slightly brighter to indicate that this space can be selected with a move.
+  def opacity_potential_tile ; @floor_sprite.opacity = 150 end
+  # reduce the opacity of the tile to emphasize other tiles.
+  def opacity_dim_tile ; @floor_sprite.opacity = 64 end
+  def reset_opacity ; @floor_sprite.opacity = 128 end
+
+  #----------------------------------------------------------------------------
+  # Area building functions
+  #----------------------------------------------------------------------------
   # Get neighbours in specified direction (e.g., not behind character)
   def neighbours_dir(directions = [:left])
     # right, top_right, top_left, left, bottom_left, bottom_right
@@ -365,6 +475,13 @@ class HexTile
     end
     return result.uniq.compact
   end
+
+  #----------------------------------------------------------------------------
+  # Target functions
+  #----------------------------------------------------------------------------
+  def add_unit(unit)    ; @unit_contents << unit end
+  def remove_unit(unit) ; @unit_contents -= [unit] end
+  def clear_units       ; @unit_contents = [] end
 
 end # HexTile
 
