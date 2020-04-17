@@ -136,7 +136,7 @@ module TSBS
     Covered = "Covered!"
   # showing text "Covered!" if a battler is being substitued
 
-    UseShadow = false
+    UseShadow = true
   # Will battler use shadow? Set it to true / false. Default is true
 
     KeepCountingDamage = true

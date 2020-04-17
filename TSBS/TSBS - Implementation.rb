@@ -564,7 +564,7 @@ module TSBS_BattlerDB
     @use_sprite = (self.class == RPG::Enemy ? false : true)
     @no_shadow = false
     @folder_ref = ""
-    @custom_shadow = "Shadow"
+    @custom_shadow = "Shadow_Small"
     @shadow_y = 4
     @shadow_resize = true
     @load_tsbs = false
@@ -5408,6 +5408,8 @@ class Sprite_BattlerShadow < Sprite
     if data_battler && data_battler.shadow_resize
       zoom_x = @sprite_battler.width.to_f / bitmap.width.to_f
       zoom_y = @sprite_battler.height.to_f / bitmap.height.to_f
+      zoom_x = 1.0 if @sprite_battler.actor?
+      zoom_y = 1.0 if @sprite_battler.actor?
       self.zoom_x = zoom_x * ($imported[:TSBS_Camera] ? $tsbs_camera.zoom : 1.0)
       self.zoom_y = zoom_y * ($imported[:TSBS_Camera] ? $tsbs_camera.zoom : 1.0)
     else

@@ -4,6 +4,15 @@ module Cache
   end
 end
 
+module Sound
+  def self.play_grid_error
+    RPG::SE.new("FEA - Error1", 45, 95).play
+  end
+  def self.play_grid_move
+    RPG::SE.new("FEA - Pop2", 60, 90).play
+  end
+end
+
 module Revoked
   module Grid
 
@@ -22,14 +31,16 @@ module Revoked
     UnitYOffset = 48
 
     DefaultPositions = {
-      1 => [0,1], # Clement
+      1 => [1,1], # Clement
       2 => [1,2], # Amaina
       3 => [1,1], # Vermund
       4 => [-1,3] # Rinore
     }
 
-    # Grid methods
-    def self.position(x_index, y_index)
+    #--------------------------------------------------------------------------
+    # ■ Get array of spaces based on an item's grid tags and any battler mods.
+    #==========================================================================
+    def self.position(row, col)
       result = {}
 
       w = TileWidth
@@ -38,14 +49,49 @@ module Revoked
       base_y = Graphics.height / 2
       x_offset = TileXOffset - (0.5 * w).to_i
       y_offset = TileYOffset - (0.5 * h).to_i
-      result[:x] = base_x + x_offset + ((x_index + 0.5 * y_index) * w).to_i
-      result[:y] = base_y + y_offset + y_index * h
+      result[:x] = base_x + x_offset + ((col + 0.5 * row) * w).to_i
+      result[:y] = base_y + y_offset + row * h
+      p("Position Coordinates: #{row}, #{col}, result: #{result}")
 
       return result
     end
 
+    def self.coordinates_from_pos(x_pos, y_pos)
+      max_row = Revoked::Grid::RadiusY
+      max_col = Revoked::Grid::RadiusX
+      w = TileWidth
+      base_x = Graphics.width / 2
+      x_offset = TileXOffset - (0.5 * w).to_i
+
+      row_split = Graphics.height / (2 * max_row + 1)
+      msgbox_p(y_pos)
+      row = y_pos / row_split - max_row
+
+      col_bound = column_boundary(row)
+      col = (((x_pos - base_x - x_offset).to_i / w) - 0.5 * row).to_i
+      4.times do |i| # Small readjustment but prevent infinite loop.
+        col += 1 if col < col_bound[:min]
+        col -= 1 if col > col_bound[:max]
+      end
+      # row = max_row if row > max_row
+      # row = -max_row if row < -max_row
+      # col = max_col if col > max_col
+      # col = -max_col if col < -max_col
+
+      p("Coordinates: #{row}, #{col}")
+      return [row,col]
+    end
+
+    # Return the min and max x (column) value on a given row.
+    def self.column_boundary(row)
+      base = Revoked::Grid::RadiusX
+      min = -base - (row < 0 ? row : 0)
+      max = base - (row > 0 ? row : 0)
+      return {:min => min, :max => max}
+    end
+
     def self.distance_between_tile(dest, orig)
-      return distance_between_rc(dest.coordinate_rc, orig.coordinate_rc)
+      return distance_between_rc(dest.coordinates_rc, orig.coordinates_rc)
     end
 
     def self.distance_between_rc(dest, orig)
@@ -73,11 +119,37 @@ module Revoked
       return result
     end
 
+    def self.calc_arc(origin_rc, direction, range = 1)
+      # direction can be :left or :right.
+      offset_x = origin_rc[1]
+      offset_y = origin_rc[0]
+
+      result = []
+
+      dir = :right ? 1 : -1
+      if direction == :right
+        range.times do |i|
+          result.push([(-1) + offset_y, (i + 1) * dir + offset_x])
+          result.push([offset_y, (i + 1) * dir + offset_x])
+          result.push([(1) + offset_y, (i) * dir + offset_x])
+        end
+      elsif direction == :left
+        range.times do |i|
+          result.push([(-1) + offset_y, (-i) * dir + offset_x])
+          result.push([offset_y, (-i - 1) * dir + offset_x])
+          result.push([(1) + offset_y, (-i - 1) * dir + offset_x])
+        end
+      end
+      return result
+
+
+    end
+
 
     #--------------------------------------------------------------------------
     # ■ Get array of spaces based on an item's grid tags and any battler mods.
     #==========================================================================
-    def self.make_area(grid, origin, item)
+    def self.make_interact(grid, origin, item)
       range = item.ability_range
       selection_tags = item.grid_selectable_tags
       area_tags = item.grid_area_tags
@@ -86,13 +158,31 @@ module Revoked
       selectable = []
       selectable.push(origin) if selection_tags.include?(:self)
 
+      dir = :left
+      if selection_tags.include?(:left)
+        dir = :left
+      elsif selection_tags.include?(:right)
+        dir = :right
+      end
+
       selection_tags.each do |tag|
         case tag
         when :radius
           selectable += grid.tiles_from_coordinates(calc_radius(origin, range))
+        when :arc
+          selectable += grid.tiles_from_coordinates(calc_arc(origin, dir, 2))
         end
       end
-      return selectable
+
+      area = []
+      area_tags.each do |tag|
+        case tag
+        when :single
+          area.push(origin)
+        end
+      end
+
+      return [selectable.uniq, area.uniq]
     end
 
     def self.auto_cursor(grid, origin, selectable, item)
@@ -108,18 +198,18 @@ module Revoked
       targets_in_range = unit_distances_in_area(grid, selectable, origin)
       return origin if targets_in_range.empty?
 
-      msgbox_p(targets_in_range)
       if target_type == :enemy
         targets_in_range.reject {|tuple| !tuple[0].enemy?}
-        anchor_coordinates = targets_in_range[1][1]
       elsif target_type == :ally && !can_target_self
         targets_in_range.reject {|tuple| !tuple[0].actor?}
-        anchor_coordinates = targets_in_range[1][1]
       elsif target_type == :ally_dead
         targets_in_range.reject {|tuple| !tuple[0].actor? && !tuple[0].dead?}
-        anchor_coordinates = targets_in_range[1][1]
       end
-      return anchor_coodinates
+
+      return origin if targets_in_range.empty?
+
+      anchor_coordinates = targets_in_range[0][1][1]
+      return anchor_coordinates
     end
 
     # return an array of battlers in the given region.
@@ -134,15 +224,20 @@ module Revoked
       tiles.each do |tile|
         battlers = tile.unit_contents
         battlers.each do |b|
-          dist = distance_between_tile(tile, origin)
-          units[b] = units[b].nil ? [dist, tile] : [[dist, units[b]].min, tile]
+          dist = distance_between_tile(tile, grid.get(*origin))
+          units[b] = !units[b] ? [dist, tile] : [[dist, units[b][0]].min, tile]
         end
       end
-      return units.sort_by {|_,dist| dist }
+      p(units.to_a)
+      return units.to_a.sort_by {|_,dist| dist }
     end
 
-    def self.wtf(grid)
-      msgbox_p(grid.get(0,0))
+    #--------------------------------------------------------------------------
+    # ■ Grid battler location calculations.
+    #==========================================================================
+    def self.set_grid_location(unit)
+
+
     end
 
   end # Grid module

@@ -29,6 +29,15 @@ module PhaseTurn
     @all_battlers = []
     @current_time = 0
     @current_event = nil
+    @hex_grid = []
+  end
+
+  def self.set_grid(hex_grid)
+    @hex_grid = hex_grid
+  end
+
+  def self.remove_grid_unit(unit)
+    @hex_grid.remove_unit(unit)
   end
 
   def self.insert_timeslot_event(event)
@@ -165,8 +174,12 @@ class Scene_Battle < Scene_Base
   alias rvkd_phaseturn_scb_start start
   def start
     rvkd_phaseturn_scb_start
+    # BattleManager.init_party_positions
     @current_action = nil
     @counter = 0
+    $game_troop.setup_grid_positions(@hex_grid)
+    $game_troop.members.each {|member| msgbox_p([member.x, member.y])}
+    PhaseTurn.set_grid(@hex_grid)
   end
 
   alias rvkd_phaseturn_scb_create_spriteset create_spriteset
@@ -180,17 +193,6 @@ class Scene_Battle < Scene_Base
     rvkd_phaseturn_scb_create_all_windows
     create_grid_target_window
   end
-
-  # alias omgrvkdwtfhappen update
-  # def update
-  #   omgrvkdwtfhappen
-  #   @counter += 1
-  #   p(@counter)
-  #   if @counter > 200
-  #     p(@hex_grid.all_tiles)
-  #     @counter = 0
-  #   end
-  # end
 
   def create_grid_target_window
     @target_window = Window_GridTarget.new(@hex_grid)
@@ -299,7 +301,6 @@ module BattleManager
       rvkd_phaseturn_bmg_init_members
       @current_event = nil
       PhaseTurn.setup
-      init_positions($game_party.members)
     end
 
     # override turn_start
@@ -321,9 +322,10 @@ module BattleManager
       return @current_event
     end
 
-    def init_positions(members)
-
-
+    def init_party_positions
+      $game_party.battle_members.each do |member|
+        member.set_grid_coordinates(*($game_party.grid_positions[member.id]))
+      end
     end
 
   end
@@ -410,19 +412,19 @@ class RPG::UsableItem < RPG::BaseItem
   end
 
   def ability_range
-    return $1.to_i if self.note =~ /<grid_range[\s_]*:[\s]*(\d+)>/i
+    return $1.to_i if self.note =~ /<grid[\s_]*range:[\s]*(\d+)>/i
     return 1
   end
 
   def grid_selectable_tags
-    if self.note =~ /grid[\s\_]*select:[\s]*(.+)/i
+    if self.note =~ /<grid[\s\_]*select:[\s]*(.+)>/i
       return $1.split(%r{,\s*}).collect{|s| s.to_sym}
     end
     return [:radius]
   end
 
   def grid_area_tags
-    if self.note =~ /grid[\s\_]*area:[\s]*(.+)/i
+    if self.note =~ /<grid[\s\_]*area:[\s]*(.+)>/i
       return $1.split(%r{,\s*}).collect{|s| s.to_sym}
     end
     return []
@@ -475,11 +477,13 @@ class Window_GridTarget < Window_Command
 
   def setup_range(battler, item)
     origin = [battler.grid_row, battler.grid_col]
-    available = Revoked::Grid.make_area(@battle_grid, origin, item)
-    cursor_origin = Revoked::Grid.auto_cursor(@battle_grid, origin, available, item)
-    test = Revoked::Grid.wtf(@battle_grid)
+    interact_tiles = Revoked::Grid.make_interact(@battle_grid, origin, item)
+    available = interact_tiles[0]
+    area = interact_tiles[1]
+    cursor_rc = Revoked::Grid.auto_cursor(@battle_grid, origin, available, item)
+    msgbox_p(cursor_rc)
 
-    @battle_grid.setup_target_selection(cursor_origin, available)
+    @battle_grid.setup_target_selection(cursor_rc, available, area)
   end
 
   def cancel_target_selection(actor)
@@ -492,5 +496,8 @@ class Window_GridTarget < Window_Command
     return process_cancel if cancel_enabled? && Input.trigger?(:B)
   end
 
+  def process_ok
+    targets = @battle_grid.selected_units
+  end
 
 end # Window_GridTarget

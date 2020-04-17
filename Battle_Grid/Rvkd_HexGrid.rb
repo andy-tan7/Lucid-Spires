@@ -26,41 +26,163 @@ class Scene_TestGrid < Scene_Base
 
 end
 
-class Game_Actor
+class Game_Battler < Game_BattlerBase
 
+  def set_grid_location(locations)
+    @grid_coordinates = locations
+  end
+
+  def grid_row ; @grid_coordinates[0][0] end
+  def grid_col ; @grid_coordinates[0][1] end
+  def grid_coordinates ; @grid_coordinates end
+
+end
+
+class Game_Actor < Game_Battler
   def original_x
-    unit_x = Revoked::Grid.position(0,0)[:x]
+    unit_x = Revoked::Grid.position(*@grid_coordinates[0])[:x]
     unit_x += Revoked::Grid::UnitXOffset
     return unit_x
   end
 
   def original_y
-    unit_y = Revoked::Grid.position(0,0)[:y]
+    unit_y = Revoked::Grid.position(*@grid_coordinates[0])[:y]
     unit_y += Revoked::Grid::UnitYOffset
     return unit_y
   end
 
-  def grid_row ; return $game_system.party_positions[@actor_id][0] end
-  def grid_col ; return $game_system.party_positions[@actor_id][1] end
+  def set_grid_coordinates(grid_row, grid_col)
+    @grid_coordinates = [[grid_row, grid_col]]
+  end
+  def grid_coordinates ; @grid_coordinates[0] end
+end
+
+class Game_Enemy < Game_Battler
+
+  def grid_size
+    return @grid_size if @grid_size
+    if $data_enemies[self.enemy_id].note =~ /<grid[\s_]*size:[\s]*(\d+)>/i
+      case $1.to_i
+      when 1 ; @grid_size = 1
+      when 2 ; @grid_size = 2
+      when 4 ; @grid_size = 4
+      else ; @grid_size = 1
+      end
+    end
+    return @grid_size
+  end
+
+  alias rvkd_hexgrid_gen_die die
+  def die
+    rvkd_hexgrid_gen_die
+    PhaseTurn.remove_grid_unit(unit)
+  end
+  # def offset_x ; return @offset_x + Revoked::Grid::UnitXOffset ; end
+  # def offset_y ; return @offset_y + Revoked::Grid::UnitYOffset ; end
 
 end
 
+# class RPG::Troop::Member
+#   def x ; return @x + Revoked::Grid::UnitXOffset ; end
+#   def y ; return @y + Revoked::Grid::UnitYOffset ; end
+# end
+
 class Game_System
 
-  attr_reader :party_positions
-  alias rvkd_hexgrid_gsy_initialize initialize
+  # attr_reader :party_positions
+  # alias rvkd_hexgrid_gsy_initialize initialize
+  # def initialize
+  #   rvkd_hexgrid_gsy_initialize
+  #   @party_positions = Revoked::Grid::DefaultPositions
+  #   (1..@party_positions.size).each do |index|
+  #     setup_party_position(index)
+  #   end
+  # end
+  #
+  # def update_party_positon(actor_id, position = [0,0])
+  #   if @party_positons.any?{|x| p[0] != actor_id && x[1].eql?(position) }
+  #     raise "Tried to update to an existing position"
+  #   end
+  #   @party_positions[actor_id] = position
+  # end
+  #
+  # def setup_party_position(actor_id)
+  #   row = @party_positions[actor_id][0]
+  #   col = @party_positions[actor_id][1]
+  #   msgbox_p($game_actors)
+  #   $game_actors[actor_id].set_grid_coordinates(row, col)
+  # end
+
+end
+
+class Game_Party
+
+  attr_reader :grid_positions
+  alias rvkd_hexgrid_gpa_initialize initialize
   def initialize
-    rvkd_hexgrid_gsy_initialize
-    @party_positions = Revoked::Grid::DefaultPositions
+    rvkd_hexgrid_gpa_initialize
+    setup_grid_positions
   end
 
-  def update_party_positon(actor_id, position = [0,0])
-    if @party_positons.any?{|x| p[0] != actor_id && x[1].eql?(position) }
-      raise "Tried to update to an existing position"
+  def setup_grid_positions
+    @grid_positions = Revoked::Grid::DefaultPositions
+    # @grid_positions.each do |actor_id, coordinates|
+    #   $game_actors[actor_id].
+    # end
+  end
+
+end
+
+class Game_Troop
+
+  # alias rvkd_hexgrid_gtr_setup setup
+  # def setup(troop_id)
+  #   rvkd_hexgrid_gtr_setup(troop_id)
+  # end
+
+  def setup_grid_positions(hex_grid)
+    members.each do |member|
+      # grid_height = 1 + 2 * (Revoked::Grid::RadiusY)
+      # msgbox_p([member.screen_x, member.screen_y])
+      x_pos = member.screen_x
+      y_pos = member.screen_y
+      xf = Revoked::Grid::TileWidth
+      yf = Revoked::Grid::TileHeight
+
+      mem_size = member.grid_size
+
+      cds = []
+      case mem_size
+      when 1
+        cds << Revoked::Grid.coordinates_from_pos(x_pos, y_pos)
+      when 2
+        cds << Revoked::Grid.coordinates_from_pos(x_pos - xf/2, y_pos)
+        cds << Revoked::Grid.coordinates_from_pos(x_pos + xf/2, y_pos)
+      when 4
+        cds << Revoked::Grid.coordinates_from_pos(x_pos - xf/2, y_pos - yf/2)
+        cds << Revoked::Grid.coordinates_from_pos(x_pos + xf/2, y_pos - yf/2)
+        cds << Revoked::Grid.coordinates_from_pos(x_pos - xf/2, y_pos + yf/2)
+        cds << Revoked::Grid.coordinates_from_pos(x_pos + xf/2, y_pos + yf/2)
+      else
+        cds.push(Revoked::Grid.coordinates_from_pos(x_pos, y_pos))
+      end
+      sum_x = 0
+      sum_y = 0
+      p(cds)
+      cds.each do |pair|
+        pos = Revoked::Grid.position(*pair)
+        sum_x += pos[:x]
+        sum_y += pos[:y]
+      end
+
+      member.screen_x = sum_x / cds.size + Revoked::Grid::UnitXOffset
+      member.screen_y = sum_y / cds.size + Revoked::Grid::UnitYOffset
+      member.set_grid_location(cds)
+      p(cds.size)
+      containing_tiles = hex_grid.tiles_from_coordinates(cds)
+      containing_tiles.each {|tile| tile.add_unit(member)}
     end
-    @party_positions[actor_id] = position
   end
-
 
 end
 
@@ -128,8 +250,11 @@ class HexGrid
     create_tiles
     #create_links
     @cursor = [0,0]
-    @grid[@cursor[0]][@cursor[1]].select_tile
+    @cursor_area = [0,0]
     @viewport = viewport
+    @sel_movable = []
+    @sel_available = []
+    @sel_potential = []
   end
 
   # Called by the scene every frame.
@@ -228,9 +353,9 @@ class HexGrid
     end
 
     unless @cursor.eql?(last)
-      Sound.play_cursor
-      @grid[last[0]][last[1]].deselect_tile
-      @grid[@cursor[0]][@cursor[1]].select_tile
+      Sound.play_grid_move
+      get(*last).deselect_tile
+      get(*@cursor).select_tile
     end
   end
 
@@ -238,20 +363,28 @@ class HexGrid
   def cursor_up(direction = :left)
     if direction == :right
       # Move to the top right.
-      if @grid[@cursor[0]-1] && @grid[@cursor[0]-1][@cursor[1]+1]
+      if @grid[@cursor[0]-1] &&
+        @sel_movable.include?(@grid[@cursor[0]-1][@cursor[1]+1])
         @cursor[0] = @cursor[0]-1
         @cursor[1] = @cursor[1]+1
-      elsif @grid[@cursor[0]-1] && @grid[@cursor[0]-1][@cursor[1]]
+      elsif @grid[@cursor[0]-1] &&
+        @sel_movable.include?(@grid[@cursor[0]-1][@cursor[1]])
         # Default to the top left if it exists and there is no top right tile.
         @cursor[0] = @cursor[0]-1
+      else
+        Sound.play_grid_error
       end
     elsif direction == :left # Move to the top left.
-      if @grid[@cursor[0]-1] && @grid[@cursor[0]-1][@cursor[1]]
+      if @grid[@cursor[0]-1] &&
+        @sel_movable.include?(@grid[@cursor[0]-1][@cursor[1]])
         @cursor[0] = @cursor[0]-1
-      elsif @grid[@cursor[0]-1] && @grid[@cursor[0]-1][@cursor[1]+1]
+      elsif @grid[@cursor[0]-1] &&
+        @sel_movable.include?(@grid[@cursor[0]-1][@cursor[1]+1])
         # Default to the top right if it exists and there is no top left tile.
         @cursor[0] = @cursor[0]-1
         @cursor[1] = @cursor[1]+1
+      else
+        Sound.play_grid_error
       end
     end
   end
@@ -260,39 +393,59 @@ class HexGrid
   def cursor_down(direction = :right)
     if direction == :left
       # Move to the bottom left.
-      if @grid[@cursor[0]+1] && @grid[@cursor[0]+1][@cursor[1]-1]
+      if @grid[@cursor[0]+1] &&
+        @sel_movable.include?(@grid[@cursor[0]+1][@cursor[1]-1])
         @cursor[0] = @cursor[0]+1
         @cursor[1] = @cursor[1]-1
-      elsif @grid[@cursor[0]+1] && @grid[@cursor[0]+1][@cursor[1]]
+      elsif @grid[@cursor[0]+1] &&
+        @sel_movable.include?(@grid[@cursor[0]+1][@cursor[1]])
         # Default to the bottom right if it exists and there is no bottom left.
         @cursor[0] = @cursor[0]+1
+      else
+        Sound.play_grid_error
       end
     elsif direction == :right # Move to the bottom right.
-      if @grid[@cursor[0]+1] && @grid[@cursor[0]+1][@cursor[1]]
+      if @grid[@cursor[0]+1] &&
+        @sel_movable.include?(@grid[@cursor[0]+1][@cursor[1]])
         @cursor[0] = @cursor[0]+1
-      elsif @grid[@cursor[0]+1] && @grid[@cursor[0]+1][@cursor[1]-1]
+      elsif @grid[@cursor[0]+1] &&
+        @sel_movable.include?(@grid[@cursor[0]+1][@cursor[1]-1])
         # Default to the bottom left if it exists and there is no bottom right.
         @cursor[0] = @cursor[0]+1
         @cursor[1] = @cursor[1]-1
+      else
+        Sound.play_grid_error
       end
     end
   end
 
   def cursor_left
-    @cursor[1] = @cursor[1]-1 unless @grid[@cursor[0]][@cursor[1]-1].nil?
+    if @sel_movable.include?(@grid[@cursor[0]][@cursor[1]-1])
+      @cursor[1] = @cursor[1]-1
+    else
+      Sound.play_grid_error
+    end
   end
 
   def cursor_right
-    @cursor[1] = @cursor[1]+1 unless @grid[@cursor[0]][@cursor[1]+1].nil?
+    if @sel_movable.include?(@grid[@cursor[0]][@cursor[1]+1])
+      @cursor[1] = @cursor[1]+1
+    else
+      Sound.play_grid_error
+    end
   end
 
   # Return an array of tiles given a 2D array of coordinates. [[y,x]]
   def tiles_from_coordinates(region = [])
     result = []
     region.each {|pair|
-      result.push(@grid[pair[0]][pair[1]]) if @grid[pair[0]] && @grid[pair[0]][pair[1]]
+      next unless @grid[pair[0]] && @grid[pair[0]][pair[1]]
+      result.push(@grid[pair[0]][pair[1]])
     }
     return result
+  end
+
+  def selected_units
   end
 
   #----------------------------------------------------------------------------
@@ -304,27 +457,59 @@ class HexGrid
 
   def set_origin(row, col)
     @cursor = [row, col]
+    @grid[row][col].select_tile
+  end
+
+  def set_cursor_tile(tile)
+    @cursor = tile.coordinates_rc
+    tile.select_tile
   end
 
   def all_tiles
     @tilelist
   end
 
-  def setup_target_selection(cursor_origin, available, potential = [])
-    @changed_squares = available + potential
+  def setup_target_selection(cursor_origin, available, area, potential = [])
+    reset_tiles(@tilelist)
+    dim_tiles = @tilelist - (available + potential)
     make_available(available)
     make_potential(potential)
+    make_dim(dim_tiles)
+
+    $game_troop.members.each {|mem| msgbox_p(mem.grid_coordinates) }
+    set_cursor_tile(cursor_origin)
+    @sel_available = available
+    @sel_potential = potential
+    @sel_movable = available + potential
   end
 
-  def cancel_target_selection(reselect = nil)
+  def cancel_target_selection(reselect_actor = nil)
     reset_tiles(all_tiles)
-    @grid[@cursor[0]][@cursor[1]].select_tile
+    #@grid[@cursor[0]][@cursor[1]].select_tile
+    msgbox_p(reselect_actor ? reselect_actor.grid_coordinates : "nil")
+    set_origin(*reselect_actor.grid_coordinates) unless reselect_actor.nil?
+    @sel_available.clear
+    @sel_potential.clear
+    @sel_movable = all_tiles
   end
 
   def make_available(tiles) ; tiles.each {|t| t.opacity_available_tile } end
   def make_potential(tiles) ; tiles.each {|t| t.opacity_potential_tile } end
-  def make_dim(tiles) ;       tiles.each {|t| t.opacity_dim_tile } end
-  def reset_tiles(tiles)    ; tiles.each {|t| t.reset_opacity } end
+  def make_dim(tiles)       ; tiles.each {|t| t.opacity_dim_tile } end
+  def reset_tiles(tiles)
+    tiles.each do |t|
+      t.reset_opacity
+      t.deselect_tile
+    end
+  end
+
+  #----------------------------------------------------------------------------
+  # Grid unit handling
+  #----------------------------------------------------------------------------
+  def remove_unit(unit)
+    all_tiles.each {|tile| tile.remove_unit(unit) }
+  end
+
 
 end # HexGrid
 
@@ -346,7 +531,7 @@ class HexTile
     @select_sprite.opacity = 0
 
     # Place tile sprites.
-    position = Revoked::Grid.position(x_index, y_index)
+    position = Revoked::Grid.position(y_index, x_index)
     @floor_sprite.x = position[:x]
     @floor_sprite.y = position[:y]
     @floor_sprite.z = 0
