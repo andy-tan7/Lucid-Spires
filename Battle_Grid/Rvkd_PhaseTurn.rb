@@ -178,7 +178,6 @@ class Scene_Battle < Scene_Base
     @current_action = nil
     @counter = 0
     $game_troop.setup_grid_positions(@hex_grid)
-    $game_troop.members.each {|member| msgbox_p([member.x, member.y])}
     PhaseTurn.set_grid(@hex_grid)
   end
 
@@ -202,6 +201,18 @@ class Scene_Battle < Scene_Base
 
   def current_time ; PhaseTurn.current_time end
 
+  alias rvkd_phaseturn_scb_sac_selection start_actor_command_selection
+  def start_actor_command_selection
+    rvkd_phaseturn_scb_sac_selection
+    @hex_grid.set_phase(:input)
+  end
+
+  def select_target_selection(battler, usable_item)
+    @target_window.refresh
+    @target_window.show.activate
+    @target_window.setup_range(battler, usable_item)
+  end
+
   def on_target_ok
     # primitive set: need to calculate area from ability with anchor point
     BattleManager.actor.input.set_target_region([@actor_window.index])
@@ -222,12 +233,6 @@ class Scene_Battle < Scene_Base
     when :item
       @item_window.activate
     end
-  end
-
-  def select_target_selection(battler, usable_item)
-    @target_window.refresh
-    @target_window.show.activate
-    @target_window.setup_range(battler, usable_item)
   end
 
   # override functions that begin target selection ----------------------------
@@ -477,13 +482,14 @@ class Window_GridTarget < Window_Command
 
   def setup_range(battler, item)
     origin = [battler.grid_row, battler.grid_col]
-    interact_tiles = Revoked::Grid.make_interact(@battle_grid, origin, item)
-    available = interact_tiles[0]
-    area = interact_tiles[1]
-    cursor_rc = Revoked::Grid.auto_cursor(@battle_grid, origin, available, item)
-    msgbox_p(cursor_rc)
+    interact = Revoked::Grid.make_interact_tiles(@battle_grid, origin, item)
+    available = interact[:available]
+    potential = interact[:potential]
+    cursor_t = Revoked::Grid.auto_cursor(@battle_grid, origin, available, item)
+    area = Revoked::Grid.make_area_tiles(@battle_grid, cursor_t, item)
 
-    @battle_grid.setup_target_selection(cursor_rc, available, area)
+    @battle_grid.set_area_item(item)
+    @battle_grid.setup_target_selection(cursor_t, available, potential, area)
   end
 
   def cancel_target_selection(actor)
@@ -497,7 +503,10 @@ class Window_GridTarget < Window_Command
   end
 
   def process_ok
-    targets = @battle_grid.selected_units
+    targets = @battle_grid.get_selected_units
+    targets.each do |targ|
+      p(targ.name)
+    end
   end
 
 end # Window_GridTarget

@@ -25,38 +25,9 @@ class Sprite_BattlerShadow < Sprite
     end
   end
 end
-class Game_Enemy < Game_Battler
 
-  def grid_size
-    return @grid_size if @grid_size
-    if $data_enemies[self.enemy_id].note =~ /<grid[\s_]*size:[\s]*(\d+)>/i
-      case $1.to_i
-      when 1 ; @grid_size = 1
-      when 2 ; @grid_size = 2
-      when 4 ; @grid_size = 4
-      else ; @grid_size = 1
-      end
-    end
-    return @grid_size
-  end
-
-  def offset_x ; return @offset_x + Revoked::Grid::UnitXOffset ; end
-  def offset_y ; return @offset_y + Revoked::Grid::UnitYOffset ; end
-
-end
-
-class RPG::Troop::Member
-  def x ; return @x + Revoked::Grid::UnitXOffset ; end
-  def y ; return @y + Revoked::Grid::UnitYOffset ; end
-end
 
 class Game_Enemy < Game_Battler
-  # def screen_x
-  #   @screen_x + Revoked::Grid::UnitXOffset
-  # end
-  # def screen_y
-  #   @screen_y + Revoked::Grid::UnitYOffset
-  # end
 
   def shadow_name
     return @shadow_name if @shadow_name

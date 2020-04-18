@@ -1,30 +1,3 @@
-# Scene used to test the features of the grid.
-class Scene_TestGrid < Scene_Base
-
-  def start
-    super
-    @hex_grid = HexGrid.new(@viewport)
-    @counter = 0
-  end
-
-  def update
-    super
-    @counter += 1
-    if @counter % 2000 == 1
-      p(@hex_grid.all_tiles)
-    end
-  end
-
-  def update_basic
-    super
-    check_input
-  end
-
-  def check_input
-    @hex_grid.update
-  end
-
-end
 
 class Game_Battler < Game_BattlerBase
 
@@ -77,41 +50,6 @@ class Game_Enemy < Game_Battler
     rvkd_hexgrid_gen_die
     PhaseTurn.remove_grid_unit(unit)
   end
-  # def offset_x ; return @offset_x + Revoked::Grid::UnitXOffset ; end
-  # def offset_y ; return @offset_y + Revoked::Grid::UnitYOffset ; end
-
-end
-
-# class RPG::Troop::Member
-#   def x ; return @x + Revoked::Grid::UnitXOffset ; end
-#   def y ; return @y + Revoked::Grid::UnitYOffset ; end
-# end
-
-class Game_System
-
-  # attr_reader :party_positions
-  # alias rvkd_hexgrid_gsy_initialize initialize
-  # def initialize
-  #   rvkd_hexgrid_gsy_initialize
-  #   @party_positions = Revoked::Grid::DefaultPositions
-  #   (1..@party_positions.size).each do |index|
-  #     setup_party_position(index)
-  #   end
-  # end
-  #
-  # def update_party_positon(actor_id, position = [0,0])
-  #   if @party_positons.any?{|x| p[0] != actor_id && x[1].eql?(position) }
-  #     raise "Tried to update to an existing position"
-  #   end
-  #   @party_positions[actor_id] = position
-  # end
-  #
-  # def setup_party_position(actor_id)
-  #   row = @party_positions[actor_id][0]
-  #   col = @party_positions[actor_id][1]
-  #   msgbox_p($game_actors)
-  #   $game_actors[actor_id].set_grid_coordinates(row, col)
-  # end
 
 end
 
@@ -126,24 +64,15 @@ class Game_Party
 
   def setup_grid_positions
     @grid_positions = Revoked::Grid::DefaultPositions
-    # @grid_positions.each do |actor_id, coordinates|
-    #   $game_actors[actor_id].
-    # end
   end
 
 end
 
 class Game_Troop
 
-  # alias rvkd_hexgrid_gtr_setup setup
-  # def setup(troop_id)
-  #   rvkd_hexgrid_gtr_setup(troop_id)
-  # end
-
   def setup_grid_positions(hex_grid)
     members.each do |member|
       # grid_height = 1 + 2 * (Revoked::Grid::RadiusY)
-      # msgbox_p([member.screen_x, member.screen_y])
       x_pos = member.screen_x
       y_pos = member.screen_y
       xf = Revoked::Grid::TileWidth
@@ -191,12 +120,6 @@ end
 #==============================================================================
 class Spriteset_Battle
 
-  # alias rvkd_hexgrid_spb_initialize initialize
-  # def initialize
-  #   create_grid
-  #   rvkd_hexgrid_spb_initialize
-  # end
-
   def create_grid
     @battle_grid = HexGrid.new(@viewport0)
     return @battle_grid
@@ -215,7 +138,6 @@ class Spriteset_Battle
     @back1_sprite = Sprite.new(@viewport0)
     @back1_sprite.bitmap = battleback1_bitmap
     @back1_sprite.z = 0
-    #center_sprite(@back1_sprite)
   end
 
   alias rvkd_hexgrid_spb_update_viewports update_viewports
@@ -235,18 +157,7 @@ end
 #==============================================================================
 class HexGrid
 
-  # def test_m
-  #   if Input.repeat?(:C)
-  #     n = @grid[@cursor[0]][@cursor[1]].neighbours_dir([1])
-  #     n.each {|t| t.select_tile if t}
-  #   elsif Input.repeat?(:B)
-  #     n = @grid[@cursor[0]][@cursor[1]].neighbours_dir([2])
-  #     n.each {|t| t.deselect_tile if t}
-  #   end
-  # end
-
   def initialize(viewport)
-    p("Initializing")
     create_tiles
     #create_links
     @cursor = [0,0]
@@ -255,6 +166,9 @@ class HexGrid
     @sel_movable = []
     @sel_available = []
     @sel_potential = []
+    @sel_area = []
+    @area_item = nil
+    @phase = :idle  # :idle, :input, :selection
   end
 
   # Called by the scene every frame.
@@ -262,14 +176,6 @@ class HexGrid
     if cursor_movable?
       process_cursor_move
     end
-    # if @to_cancel
-    #   reset_tiles(all_tiles)
-    #   @to_cancel = false
-    # end
-    # if @to_dim != nil
-    #   make_dim(all_tiles - @to_dim)
-    #   @to_dim = nil
-    # end
   end
 
   # Default -------------------------------------------------------------------
@@ -282,9 +188,10 @@ class HexGrid
     # grid center and allow for "negative indices" relative to the origin.
     @grid = {}
     @tilelist = []
+    @grid_arrow = GridArrow.new(@viewport)
+
     radius_x = Revoked::Grid::RadiusX
     radius_y = Revoked::Grid::RadiusY
-
     (-radius_y..radius_y).each do |row|
       @grid[row] = {}
       left_ind  = row < 0 ? -radius_x - row : -radius_x
@@ -294,28 +201,6 @@ class HexGrid
         @tilelist.push(@grid[row][col])
       }
     end
-  end
-
-  #----------------------------------------------------------------------------
-  # create_links
-  #  2 1     \       make a reference to all neighbours for each node.
-  # 3 x 0  ---\---
-  #  4 5       \     note: y axis is slanted to the left.
-  #----------------------------------------------------------------------------
-  def create_links
-    # The grid keys -> row indexes (-radius_y, ... 0, ... radius_y)
-    # grid[row] keys -> column indexes (-radius_x, ... 0, ... radius_x)
-    @grid.keys.each { |row|
-      @grid[row].keys.each { |col|
-        tile = @grid[row][col]
-        tile.make_neighbour(0, @grid[row][col + 1])                     # r
-        tile.make_neighbour(1, @grid[row - 1][col + 1]) if @grid[row-1] # tr
-        tile.make_neighbour(2, @grid[row - 1][col]) if @grid[row-1]     # tl
-        tile.make_neighbour(3, @grid[row][col - 1])                     # l
-        tile.make_neighbour(4, @grid[row + 1][col - 1]) if @grid[row+1] # bl
-        tile.make_neighbour(5, @grid[row + 1][col]) if @grid[row+1]     # br
-      }
-    }
   end
 
   def dispose_grid
@@ -333,19 +218,9 @@ class HexGrid
     #test_m
 
     if Input.repeat?(:UP)
-      # if Input.press?(:left)
         cursor_up(:left)
-      # elsif Input.repeat?(:right)
-      #   cursor_up(:right)
-      # end
-      #Input.dir8 == 9 ? cursor_up(:right) : cursor_up(:left)
     elsif Input.repeat?(:DOWN)
-      # if Input.repeat?(:left)
-      #   cursor_down(:left)
-      # elsif Input.repeat?(:right)
         cursor_down(:right)
-      # end
-      #Input.dir8 == 1 ? cursor_down(:left) : cursor_down(:right)
     elsif Input.repeat?(:LEFT)
       cursor_left
     elsif Input.repeat?(:RIGHT)
@@ -354,8 +229,9 @@ class HexGrid
 
     unless @cursor.eql?(last)
       Sound.play_grid_move
-      get(*last).deselect_tile
-      get(*@cursor).select_tile
+      cursor_deselect(get(*last))
+      recalculate_area
+      cursor_select(get(*@cursor))
     end
   end
 
@@ -439,13 +315,10 @@ class HexGrid
   def tiles_from_coordinates(region = [])
     result = []
     region.each {|pair|
-      next unless @grid[pair[0]] && @grid[pair[0]][pair[1]]
-      result.push(@grid[pair[0]][pair[1]])
+      next unless @grid[pair[0]] && get(*pair)
+      result.push(get(*pair))
     }
     return result
-  end
-
-  def selected_units
   end
 
   #----------------------------------------------------------------------------
@@ -454,30 +327,34 @@ class HexGrid
   def get(row, col)
     return @grid[row][col]
   end
+  def all_tiles ; @tilelist ; end
 
   def set_origin(row, col)
     @cursor = [row, col]
-    @grid[row][col].select_tile
+    cursor_select(get(*@cursor))
   end
 
   def set_cursor_tile(tile)
     @cursor = tile.coordinates_rc
-    tile.select_tile
+    cursor_select(tile)
   end
 
-  def all_tiles
-    @tilelist
+  def set_area_item(item) ; @area_item = item ; end
+  def recalculate_area
+    return if @area_item.nil? || @sel_area.empty?
+    unhighlight_for_area(@sel_area)
+    @sel_area = Revoked::Grid::make_area_tiles(self, get(*@cursor), @area_item)
   end
 
-  def setup_target_selection(cursor_origin, available, area, potential = [])
+  def setup_target_selection(cursor_origin, available, potential, area)
     reset_tiles(@tilelist)
     dim_tiles = @tilelist - (available + potential)
     make_available(available)
     make_potential(potential)
     make_dim(dim_tiles)
 
-    $game_troop.members.each {|mem| msgbox_p(mem.grid_coordinates) }
     set_cursor_tile(cursor_origin)
+    @sel_area = area
     @sel_available = available
     @sel_potential = potential
     @sel_movable = available + potential
@@ -485,14 +362,31 @@ class HexGrid
 
   def cancel_target_selection(reselect_actor = nil)
     reset_tiles(all_tiles)
-    #@grid[@cursor[0]][@cursor[1]].select_tile
-    msgbox_p(reselect_actor ? reselect_actor.grid_coordinates : "nil")
     set_origin(*reselect_actor.grid_coordinates) unless reselect_actor.nil?
+    @area_item = nil
+    @sel_area.clear
     @sel_available.clear
     @sel_potential.clear
     @sel_movable = all_tiles
   end
 
+  # Sprite changes
+  def cursor_select(tile) ; tile.select_tile end
+  def cursor_deselect(tile)
+    tile.deselect_tile
+    tile.unlight_area
+  end
+
+  def highlight_for_area(t)
+    t.light_area if t.is_a?(HexTile) && !t.equal?(get(*@cursor))
+    t.each {|h| h.light_area if !h.equal?(get(*@cursor))} if t.is_a?(Array)
+  end
+  def unhighlight_for_area(t)
+    t.light_area if t.is_a?(HexTile) && !t.equal?(get(*@cursor))
+    t.each {|h| h.unlight_area if !h.equal?(get(*@cursor))} if t.is_a?(Array)
+  end
+
+  # Opacity changes
   def make_available(tiles) ; tiles.each {|t| t.opacity_available_tile } end
   def make_potential(tiles) ; tiles.each {|t| t.opacity_potential_tile } end
   def make_dim(tiles)       ; tiles.each {|t| t.opacity_dim_tile } end
@@ -500,6 +394,7 @@ class HexGrid
     tiles.each do |t|
       t.reset_opacity
       t.deselect_tile
+      t.unlight_area
     end
   end
 
@@ -510,6 +405,14 @@ class HexGrid
     all_tiles.each {|tile| tile.remove_unit(unit) }
   end
 
+  def get_selected_units
+    p(@sel_area)
+    units = []
+    @sel_area.each {|tile| units.push(tile.unit_contents) }
+    units.flatten!
+    units.uniq!
+    return units
+  end
 
 end # HexGrid
 
@@ -518,7 +421,6 @@ end # HexGrid
 #------------------------------------------------------------------------------
 class HexTile
 
-  attr_reader :neighbours
   attr_reader :unit_contents
   def initialize(x_index, y_index, viewport)
     @viewport = viewport
@@ -543,9 +445,6 @@ class HexTile
     @ind_x = x_index
     @ind_y = y_index
     @selected = false
-    # right, top_right, top_left, left, bottom_left, bottom_right
-    @neighbours = [nil,nil,nil,nil,nil,nil]
-    # keep track of units on the tile.
     clear_units
     refresh
   end
@@ -561,11 +460,6 @@ class HexTile
     @unit_contents.clear
     @floor_sprite.dispose
     @select_sprite.dispose
-  end
-
-  # Set neighbour array
-  def make_neighbour(index, neighbour_tile)
-    @neighbours[index] ||= neighbour_tile
   end
 
   # Override x=
@@ -613,14 +507,14 @@ class HexTile
   end
 
   # Secondary tile from main tile (i.e., area of effect radius)
-  def set_area_effect_tile
+  def light_area
     @selected = true
     @select_sprite.bitmap = Cache.grid("htile_glow_s")
     @select_sprite.opacity = 200
     refresh
   end
 
-  def reset_area_effect_tile
+  def unlight_area
     @selected = false
     @select_sprite.opacity = 0
     refresh
@@ -635,33 +529,6 @@ class HexTile
   def reset_opacity ; @floor_sprite.opacity = 128 end
 
   #----------------------------------------------------------------------------
-  # Area building functions
-  #----------------------------------------------------------------------------
-  # Get neighbours in specified direction (e.g., not behind character)
-  def neighbours_dir(directions = [:left])
-    # right, top_right, top_left, left, bottom_left, bottom_right
-    result = []
-    puts (directions)
-    directions.each do |dir|
-      case dir
-      when :right
-        result |= [@neighbours[0]]
-      when :top_right
-        result |= [@neighbours[1]]
-      when :top_left
-        result |= [@neighbours[2]]
-      when :left
-        result |= [@neighbours[3]]
-      when :bottom_left
-        result |= [@neighbours[4]]
-      when :bottom_right
-        result |= [@neighbours[5]]
-      end
-    end
-    return result.uniq.compact
-  end
-
-  #----------------------------------------------------------------------------
   # Target functions
   #----------------------------------------------------------------------------
   def add_unit(unit)    ; @unit_contents << unit end
@@ -671,5 +538,34 @@ class HexTile
 end # HexTile
 
 #------------------------------------------------------------------------------
-# Grid Sprite
+# Grid Arrow
 #------------------------------------------------------------------------------
+class GridArrow
+
+  def initialize(viewport)
+    @viewport = viewport
+    @arrow = Sprite.new(@viewport)
+    @arrow.bitmap = Cache.grid("arrow_1")
+    set_opacity(0)
+
+    @index = 1
+  end
+
+  def update_position(row, col)
+    pos = Revoked::Grid.position(row, col)
+    self.x = pos[:x]
+    self.y = pos[:y]
+  end
+
+  def update_index
+    @index += 1
+    @index = 1 if @index > 30
+    self.bitmap = Cache.grid("arrow_#{@index/6}") if @index % 6 == 0
+  end
+
+  def set_opacity(opac)
+    @arrow.opacity = opac
+    @visible = opac == 0 ? false : true
+  end
+
+end
