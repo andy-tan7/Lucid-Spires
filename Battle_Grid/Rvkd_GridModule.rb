@@ -82,7 +82,21 @@ module Revoked
     end
 
     def self.distance_between_rc(dest, orig)
-      return [dest[1] - orig[1], dest[0] - orig[0]].max
+      z_dest = calc_depth(*dest)
+      z_orig = calc_depth(*orig)
+
+      delta = {
+        :row => (dest[0] - orig[0]).abs,
+        :col => (dest[1] - orig[1]).abs,
+        :depth => (z_dest - z_orig).abs,
+      }
+
+      return delta.values.max
+    end
+
+    # return the coordinate of the third axis for distance calculation.
+    def self.calc_depth(row, col)
+      return (row + col) * -1
     end
 
   #----------------------------------------------------------------------------
@@ -146,11 +160,11 @@ module Revoked
       selection_tags.each do |tag|
         case tag
         when :self
-          selectable << origin
+          selectable += grid.tiles_from_coordinates([origin])
         when :radius
           selectable += grid.tiles_from_coordinates(calc_radius(origin, range))
         when :arc
-          selectable += grid.tiles_from_coordinates(calc_arc(origin, dir, range))
+          selectable += grid.tiles_from_coordinates(calc_arc(origin,dir,range))
         end
       end
 
@@ -219,11 +233,22 @@ module Revoked
         battlers = tile.unit_contents
         battlers.each do |b|
           dist = distance_between_tile(tile, grid.get(*origin))
-          units[b] = !units[b] ? [dist, tile] : [[dist, units[b][0]].min, tile]
+          msgbox_p(dist, [dist, units[b][0]].min) if units[b] && units[b][0] != nil
+          # units[b] = !units[b] ? [dist, tile] : [[dist, units[b][0]].min, tile]
+          if units[b].nil?
+            units[b] = [dist, tile]
+          else
+            units[b][0] = dist if dist < units[b][0]
+          end
         end
       end
-      p(units.to_a)
-      return units.to_a.sort_by {|_,dist| dist }
+
+      unit_array = units.to_a
+      unit_array.sort_by {|_,dist| dist[0] }.reverse
+      unit_array.each {|u|
+        msgbox_p("dist: #{u[1][0]}, coordinate: #{u[1][1].coordinates_rc}")
+      }
+      return unit_array
     end
 
     #--------------------------------------------------------------------------

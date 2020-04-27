@@ -59,11 +59,18 @@ class Game_Party
   alias rvkd_hexgrid_gpa_initialize initialize
   def initialize
     rvkd_hexgrid_gpa_initialize
-    setup_grid_positions
+    initialize_grid_variable
   end
 
-  def setup_grid_positions
+  def initialize_grid_variable
     @grid_positions = Revoked::Grid::DefaultPositions
+  end
+
+  def setup_grid_positions(hex_grid)
+    members.each do |member|
+      coordinates = member.grid_coordinates
+      hex_grid.get(*coordinates).add_unit(member)
+    end
   end
 
 end
@@ -97,7 +104,6 @@ class Game_Troop
       end
       sum_x = 0
       sum_y = 0
-      p(cds)
       cds.each do |pair|
         pos = Revoked::Grid.position(*pair)
         sum_x += pos[:x]
@@ -107,7 +113,6 @@ class Game_Troop
       member.screen_x = sum_x / cds.size + Revoked::Grid::UnitXOffset
       member.screen_y = sum_y / cds.size + Revoked::Grid::UnitYOffset
       member.set_grid_location(cds)
-      p(cds.size)
       containing_tiles = hex_grid.tiles_from_coordinates(cds)
       containing_tiles.each {|tile| tile.add_unit(member)}
     end
@@ -162,6 +167,8 @@ class HexGrid
     #create_links
     @cursor = [0,0]
     @cursor_area = [0,0]
+    @adapt_dir = {:up => nil, :down => nil, :actor_row => 0}
+
     @viewport = viewport
     @sel_movable = []
     @sel_available = []
@@ -207,20 +214,42 @@ class HexGrid
     @grid.each {|tile| tile.dispose }
   end
 
-  def cursor_movable?
-    return true
+  def cursor_movable? ; @phase == :selection ; end
+
+  # Cause the cursor to "bend" around the actor making an input.
+  def setup_adaptive_cursor
+    @adapt_dir[:actor_row] = BattleManager.actor.grid_coordinates[0] rescue 0
+    update_adaptive_cursor
+  end
+
+  def update_adaptive_cursor
+    @adapt_dir[:up] = @cursor[0] > @adapt_dir[:actor_row] ? :left : :right
+    @adapt_dir[:down] = @cursor[0] < @adapt_dir[:actor_row] ? :left : :right
+  end
+
+  # :input, :selection, :idle
+  def set_phase(phase)
+    case phase
+    when :input
+      @phase = :input
+      set_origin(*BattleManager.actor.grid_coordinates)
+    when :selection
+      @phase = :selection
+      setup_adaptive_cursor
+    when :idle
+      @phase = :idle
+    end
   end
 
   # Handle directional movement on the grid.
   def process_cursor_move
     return unless cursor_movable?
     last = @cursor.dup
-    #test_m
 
     if Input.repeat?(:UP)
-        cursor_up(:left)
+      cursor_up(@adapt_dir[:up])
     elsif Input.repeat?(:DOWN)
-        cursor_down(:right)
+      cursor_down(@adapt_dir[:down])
     elsif Input.repeat?(:LEFT)
       cursor_left
     elsif Input.repeat?(:RIGHT)
@@ -232,6 +261,7 @@ class HexGrid
       cursor_deselect(get(*last))
       recalculate_area
       cursor_select(get(*@cursor))
+      update_adaptive_cursor
     end
   end
 
@@ -360,9 +390,8 @@ class HexGrid
     @sel_movable = available + potential
   end
 
-  def cancel_target_selection(reselect_actor = nil)
+  def cancel_target_selection
     reset_tiles(all_tiles)
-    set_origin(*reselect_actor.grid_coordinates) unless reselect_actor.nil?
     @area_item = nil
     @sel_area.clear
     @sel_available.clear
@@ -406,12 +435,16 @@ class HexGrid
   end
 
   def get_selected_units
-    p(@sel_area)
     units = []
     @sel_area.each {|tile| units.push(tile.unit_contents) }
     units.flatten!
+    msgbox_p(units.collect {|u| u.name})
     units.uniq!
     return units
+  end
+
+  def copy_selected_area
+    return @sel_area.dup
   end
 
 end # HexGrid
@@ -534,6 +567,8 @@ class HexTile
   def add_unit(unit)    ; @unit_contents << unit end
   def remove_unit(unit) ; @unit_contents -= [unit] end
   def clear_units       ; @unit_contents = [] end
+
+  def occupied? ; return !@unit_contents.nil? && !@unit_contents.empty? ; end
 
 end # HexTile
 

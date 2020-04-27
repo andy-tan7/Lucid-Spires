@@ -9,20 +9,12 @@ module PhaseTurn
   INITIAL_TURN_SPAN = 20
   DEFAULT_RESET_TIME = 20
 
-  module Calc
-
-    # return whether the candidate should be inserted here.
-    def self.can_insert(first, second, add)
-      return true if first.time < add.time && add.time < second.time
-      return false
-    end
-
-  end
-
-
   def self.setup
     init_members
   end
+
+  def self.current_time ; return @current_time ; end
+  def self.current_event ; return @current_event ; end
 
   def self.init_members
     @schedule = []
@@ -45,23 +37,20 @@ module PhaseTurn
     # Add to the very start if there is no preparation time.
     if event.time == current_time
       @schedule.unshift(event)
-
     # Append if there is only one object.
     elsif @schedule.size == 1
       @schedule.push(event)
-
     # Find the appropriate insertion point.
     else
       index = 0
       while (index + 1) < @schedule.size
-        if Calc.can_insert(@schedule[index], @schedule[next_index], event)
-          @schedule.insert(next_index, event)
-          return true
+        if can_insert(@schedule[index], @schedule[index + 1], event)
+          @schedule.insert(index + 1, event)
         else
           index += 1
         end
       end
-      return false
+      @schedule.push(event) if event.time > @schedule.last.time
     end
   end
 
@@ -76,7 +65,6 @@ module PhaseTurn
     return nil if !@current_event
 
     @current_time = @current_event.time
-    p_schedule
     return @current_event
   end
 
@@ -108,13 +96,21 @@ module PhaseTurn
     return pairs
   end
 
+  def self.can_insert(first, second, add)
+    return true if first.time < add.time && add.time < second.time
+    return false
+  end
+
   def self.p_schedule
-    p("Schedule from #{@current_time}")
+    return unless @current_event
+    p("Schedule from #{@current_time} ---------------------------------------")
     cur = @current_event
     p([cur.battler.name, cur.time, cur.type, cur.unit_type])
-    @schedule.each {|turn|
-      p([turn.battler.name, turn.time, turn.type, turn.unit_type])
+    @schedule.each {|ts|
+      next unless ts.subject
+      p("#{ts.battler.name}, #{ts.time}, #{ts.type}, #{ts.unit_type}")
     }
+    p("----------------------------------------------------------------------")
   end
 
 end # module PhaseTurn
@@ -128,8 +124,9 @@ class Rvkd_TimeSlotEvent
     @time = time
   end
 
-  def phase ; timeslot / PhaseTurn::Calc::PHASE_DURATION end
-  def type ; :event end
+  def subject ; nil ; end
+  def phase ; timeslot / PhaseTurn::Calc::PHASE_DURATION ; end
+  def type ; :event ; end
 end
 
 #=============================================================================
@@ -142,6 +139,7 @@ class Rvkd_TimeSlotTurn < Rvkd_TimeSlotEvent
     @battler = battler    # Game_Battler
   end
 
+  def subject ; @battler end
   def type ; :turn end
 
   def unit_type
@@ -157,13 +155,41 @@ end
 #=============================================================================
 class Rvkd_TimeSlotAction < Rvkd_TimeSlotTurn
   attr_reader :action
-
   def initialize(time, battler, action)
     super(time, battler)
     @action = action  # Game_Action
   end
 
-    def type ; :action end
+  def type ; :action end
+end
+
+#=============================================================================
+# ■ Game_Action
+#=============================================================================
+class Game_Action
+
+  # calculate the time it takes before the action is executed.
+  # typically 0. Affects when the TimeSlotAction is enqueued in the turn list.
+  def prep_time
+    time = item.prep_time
+    fixed = item.prep_fixed
+    if fixed
+      return time # return the flat time if it cannot be modified
+    else
+      return time # return the time adjusted with speed (TODO)
+    end
+  end
+
+  def reset_time
+    time = item.reset_time
+    fixed = item.reset_fixed
+    if fixed
+      return time # return the flat time if it cannot be modified
+    else
+      return time # return the time adjusted with speed (TODO)
+    end
+  end
+
 end
 
 #=============================================================================
@@ -181,22 +207,27 @@ class Scene_Battle < Scene_Base
     PhaseTurn.set_grid(@hex_grid)
   end
 
+  alias rvkd_phaseturn_scb_post_start post_start
+  def post_start
+    rvkd_phaseturn_scb_post_start
+    $game_party.setup_grid_positions(@hex_grid)
+    @hex_grid.set_phase(:idle)
+
+    test_pos = []
+    @hex_grid.all_tiles.each do |tile|
+      if tile.occupied?
+        test_pos.push([tile.unit_contents[0].name], tile.coordinates_rc)
+      end
+    end
+    p("test pos: #{test_pos}")
+
+    next_command
+  end
+
   alias rvkd_phaseturn_scb_create_spriteset create_spriteset
   def create_spriteset
     rvkd_phaseturn_scb_create_spriteset
     @hex_grid = @spriteset.create_grid
-  end
-
-  alias rvkd_phaseturn_scb_create_all_windows create_all_windows
-  def create_all_windows
-    rvkd_phaseturn_scb_create_all_windows
-    create_grid_target_window
-  end
-
-  def create_grid_target_window
-    @target_window = Window_GridTarget.new(@hex_grid)
-    @target_window.set_handler(:ok,     method(:on_target_ok))
-    @target_window.set_handler(:cancel, method(:on_target_cancel))
   end
 
   def current_time ; PhaseTurn.current_time end
@@ -204,70 +235,56 @@ class Scene_Battle < Scene_Base
   alias rvkd_phaseturn_scb_sac_selection start_actor_command_selection
   def start_actor_command_selection
     rvkd_phaseturn_scb_sac_selection
+    BattleManager.input_start
     @hex_grid.set_phase(:input)
   end
 
-  def select_target_selection(battler, usable_item)
-    @target_window.refresh
-    @target_window.show.activate
-    @target_window.setup_range(battler, usable_item)
-  end
-
-  def on_target_ok
-    # primitive set: need to calculate area from ability with anchor point
-    BattleManager.actor.input.set_target_region([@actor_window.index])
-    create_timeslot_action(BattleManager.actor.input)
-    @target_window.cancel_target_selection(BattleManager.actor)
-  end
-
-  def on_target_cancel
-    p("c")
-    @target_window.deactivate
-    @target_window.hide
-    @target_window.cancel_target_selection(BattleManager.actor)
-    case @actor_command_window.current_symbol
-    when :attack
-      @actor_command_window.activate
-    when :skill
-      @skill_window.activate
-    when :item
-      @item_window.activate
-    end
-  end
-
-  # override functions that begin target selection ----------------------------
-  def command_attack
-    usable_item = $data_skills[BattleManager.actor.attack_skill_id]
-    BattleManager.actor.input.set_skill(usable_item.id)
-    select_target_selection(BattleManager.actor, usable_item)
-  end
-
-  def on_skill_ok
-    usable_item = @skill_window.item
-    BattleManager.actor.input.set_skill(usable_item.id)
-    select_target_selection(BattleManager.actor, usable_item)
-  end
-
-  def on_item_ok
-    usable_item = @item_window.item
-    BattleManager.actor.input.set_item(usable_item.id)
-    select_target_selection(BattleManager.actor, usable_item)
-  end
+  # override to delete
+  def start_party_command_selection ; end
 
   # override ------------------------------------------------------------------
   def next_command
     event = BattleManager.next_command
     if event
+      PhaseTurn.p_schedule
       case event.type
       when :event
         #environmental?
       when :turn
         # process inputs
-        start_actor_command_selection if event.battler.is_a?(Game_Actor)
+        if event.battler.is_a?(Game_Actor)
+          event.battler.make_actions
+          start_actor_command_selection
+        elsif event.battler.is_a?(Game_Enemy)
+          queue_enemy_next_turn(event)
+        end
       when :action
         # process execution
+        @party_command_window.close
+        @actor_command_window.close
+        @status_window.unselect
+        @subject = nil
+        BattleManager.action_start
       end
     end
+  end
+
+  def queue_enemy_next_turn(time_slot_event)
+    enemy = time_slot_event.battler
+    enemy.make_actions
+
+    action = enemy.actions[0]
+
+    prep_time = action.prep_time
+    reset_time = action.reset_time
+
+    exec_time = current_time + prep_time
+    next_turn_time = exec_time + reset_time
+
+    temp_action = Rvkd_TimeSlotAction.new(exec_time, enemy, action)
+    temp_next_turn = Rvkd_TimeSlotTurn.new(next_turn_time, enemy)
+    PhaseTurn.insert_timeslot_event(temp_action)
+    PhaseTurn.insert_timeslot_event(temp_next_turn)
   end
 
   # build a Rvkd_TimeSlotAction and enqueue it in the turn list. Needs:
@@ -291,52 +308,107 @@ class Scene_Battle < Scene_Base
     PhaseTurn.insert_timeslot_event(temp_next_turn)
   end
 
+  # override
+  def process_action
+    return if scene_changing?
+    if !@subject || !@subject.current_action
+      phase_event = PhaseTurn.current_event
+      @subject = phase_event.subject if phase_event && phase_event.subject
+    end
+    return turn_end unless @subject
+
+    if @subject.current_action
+      @subject.current_action.prepare
+      if @subject.current_action.valid?
+        @status_window.open
+        execute_action
+      end
+      @subject.remove_current_action
+    end
+    process_action_end unless @subject.current_action
+  end
+
+  # override
+  def process_action_end
+    @subject.on_action_end
+    refresh_status
+    @log_window.display_auto_affected_status(@subject)
+    @log_window.wait_and_clear
+    @log_window.display_current_state(@subject)
+    @log_window.wait_and_clear
+    BattleManager.judge_win_loss
+    next_command
+  end
 
 end # Scene_Battle
 
 #=============================================================================
 # ■ BattleManager
 #=============================================================================
-module BattleManager
+class << BattleManager
 
-  class << self
+  alias rvkd_phaseturn_bmg_init_members init_members
+  def init_members
+    rvkd_phaseturn_bmg_init_members
+    @current_event = nil
+    PhaseTurn.setup
+  end
 
-    alias rvkd_phaseturn_bmg_init_members init_members
-    def init_members
-      rvkd_phaseturn_bmg_init_members
-      @current_event = nil
-      PhaseTurn.setup
-    end
+  # override turn_start
+  # def turn_start
+  #   @phase = :turn
+  #   clear_actor
+  #   $game_troop.increase_turn
+  #   PhaseTurn.start_new_phase($game_party.members + $game_troop.members)
+  # end
 
-    # override turn_start
-    def turn_start
-      @phase = :turn
-      clear_actor
-      $game_troop.increase_turn
+  # override actor
+  def actor
+    return @current_event.battler if @current_event.battler.actor?
+    return nil
+  end
+
+  # override next_command
+  def next_command
+    unless @current_event
       PhaseTurn.start_new_phase($game_party.members + $game_troop.members)
     end
 
-    # override next_command
-    def next_command
-      unless @current_event
-        PhaseTurn.start_new_phase($game_party.members + $game_troop.members)
-      end
+    @current_event = PhaseTurn.next_event
+    #@actor_index = $game_party.members.index(@current_event.battler)
+    return @current_event
+  end
 
-      @current_event = PhaseTurn.next_event
-      @actor_index = $game_party.members.index(@current_event.battler)
-      return @current_event
+  def current_event ; return @current_event ; end
+  def current_subject ; return @current_event.subject ; end
+
+  def action_start
+    turn_start
+  end
+
+  # override input_start
+  def input_start
+    @phase = :input
+  end
+
+  # override turn_start
+  def turn_start
+    @phase = :turn
+    clear_actor
+    $game_troop.increase_turn
+  end
+
+  def init_party_positions
+    $game_party.battle_members.each do |member|
+      member.set_grid_coordinates(*($game_party.grid_positions[member.id]))
     end
-
-    def init_party_positions
-      $game_party.battle_members.each do |member|
-        member.set_grid_coordinates(*($game_party.grid_positions[member.id]))
-      end
-    end
-
   end
 
 end
 
+#=============================================================================
+# ■ Game_Battler
+#=============================================================================
 class Game_Battler < Game_BattlerBase
 
   alias rvkd_phaseturn_gbt_initialize initialize
@@ -353,41 +425,18 @@ class Game_Battler < Game_BattlerBase
 end
 
 #=============================================================================
-# ■ Game_Action
+# ■ Game_Enemy
 #=============================================================================
-class Game_Action
+class Game_Enemy < Game_Battler
 
-  # calculate the time it takes before the action is executed.
-  # typically 0. Affects when the TimeSlotAction is enqueued in the turn list.
-  def prep_time
-    time = item.prep_time
-    fixed = item.prep_fixed
+  alias rvkd_phaseturn_gen_make_actions make_actions
+  def make_actions
+    rvkd_phaseturn_gen_make_actions
 
-    if fixed
-      return time
-    else
-      return time
-    end
   end
 
-  def reset_time
-    time = item.reset_time
-    fixed = item.reset_fixed
+end
 
-    if fixed
-      return time
-    else
-      return time
-    end
-  end
-
-
-  attr_reader :target_grid
-  def set_target_region(region)
-    target_grid = region.is_a?(Array) ? region : []
-  end
-
-end # Game_Action
 
 #=============================================================================
 # ■ RPG::UsableItem
@@ -451,62 +500,3 @@ class RPG::UsableItem < RPG::BaseItem
   end
 
 end
-
-#=============================================================================
-# ■ Window_GridTarget
-#=============================================================================
-class Window_GridTarget < Window_Command
-
-  def initialize(battle_grid)
-    super(0, 0)
-    @battle_grid = battle_grid
-    refresh
-    self.openness = 0
-    self.active = false
-  end
-
-  def update
-    super
-    if self.active
-      @battle_grid.update
-    end
-  end
-
-  def ok_enabled?
-    true
-  end
-
-  def cancel_enabled?
-    true
-  end
-
-  def setup_range(battler, item)
-    origin = [battler.grid_row, battler.grid_col]
-    interact = Revoked::Grid.make_interact_tiles(@battle_grid, origin, item)
-    available = interact[:available]
-    potential = interact[:potential]
-    cursor_t = Revoked::Grid.auto_cursor(@battle_grid, origin, available, item)
-    area = Revoked::Grid.make_area_tiles(@battle_grid, cursor_t, item)
-
-    @battle_grid.set_area_item(item)
-    @battle_grid.setup_target_selection(cursor_t, available, potential, area)
-  end
-
-  def cancel_target_selection(actor)
-    @battle_grid.cancel_target_selection(actor)
-  end
-
-  def process_handling
-    return unless active
-    return process_ok     if ok_enabled?     && Input.trigger?(:C)
-    return process_cancel if cancel_enabled? && Input.trigger?(:B)
-  end
-
-  def process_ok
-    targets = @battle_grid.get_selected_units
-    targets.each do |targ|
-      p(targ.name)
-    end
-  end
-
-end # Window_GridTarget
