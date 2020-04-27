@@ -37,6 +37,22 @@ module TSBS
 
   ClementPose = {
 
+    "clement_attack" => [
+    [],
+    [:pose, 2, 0, 12],
+    [:pose, 2, 1, 12],
+    #[:move_to_target, 40, 0, 15, 0],
+    [:pose, 2, 8, 4],
+    [:pose, 1, 24, 12],
+    [:show_anim],
+    [:pose, 1, 25, 2],
+    [:pose, 1, 25, 2],
+    [:pose, 1, 26, 4],
+    [:target_damage],
+    [:pose, 1, 27, 14],
+    [:wait, 10],
+    ],
+
     "Cast_Light" => [
     [],
     [:pose, 1,40,6],

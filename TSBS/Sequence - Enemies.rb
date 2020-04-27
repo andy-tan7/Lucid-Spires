@@ -77,7 +77,7 @@ module TSBS
   ],
   "Chiro_Attack" => [
   [],
-  [:action, "Show_Range"],
+  # [:action, "Show_Range"],
   [:move_to_targ_s, 65, 10, 7, 1],
   [:pose, 1, 12, 4],
   [:pose, 1, 13, 4],

@@ -60,19 +60,7 @@ module TSBS
 
   # Define new action sequence between {}
 
-  "clement_attack" => [
-  [],
-  [:pose, 1, 36, 6],
-  [:move_to_target, 40, 0, 15, 0],
-  [:pose, 1, 32, 9],
-  [:pose, 1, 28, 10],
-  [:pose, 1, 25, 5],
-  [:show_anim],
-  [:pose, 1, 26, 5],
-  [:target_damage],
-  [:pose, 1, 27, 5],
-  [:wait, 10],
-  ],
+
 
   # ---------------------------------------------------------------------------
   # Idle sequence
