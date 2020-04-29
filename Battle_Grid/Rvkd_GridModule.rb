@@ -222,7 +222,7 @@ module Revoked
 
     # return an array of battlers in the given region.
     def self.units_in_area(grid, tiles)
-      units = tiles.collect {|tile| tile.unit_contents }.compact.uniq
+      units = tiles.collect {|tile| tile.unit_contents }.compact.uniq.flatten
       return units
     end
 
@@ -233,7 +233,7 @@ module Revoked
         battlers = tile.unit_contents
         battlers.each do |b|
           dist = distance_between_tile(tile, grid.get(*origin))
-          msgbox_p(dist, [dist, units[b][0]].min) if units[b] && units[b][0] != nil
+          # msgbox_p(dist, [dist, units[b][0]].min) if units[b] && units[b][0] != nil
           # units[b] = !units[b] ? [dist, tile] : [[dist, units[b][0]].min, tile]
           if units[b].nil?
             units[b] = [dist, tile]
@@ -245,9 +245,9 @@ module Revoked
 
       unit_array = units.to_a
       unit_array.sort_by {|_,dist| dist[0] }.reverse
-      unit_array.each {|u|
-        msgbox_p("dist: #{u[1][0]}, coordinate: #{u[1][1].coordinates_rc}")
-      }
+      # unit_array.each {|u|
+      #   msgbox_p("dist: #{u[1][0]}, coordinate: #{u[1][1].coordinates_rc}")
+      # }
       return unit_array
     end
 

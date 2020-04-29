@@ -438,13 +438,20 @@ class HexGrid
     units = []
     @sel_area.each {|tile| units.push(tile.unit_contents) }
     units.flatten!
-    msgbox_p(units.collect {|u| u.name})
     units.uniq!
     return units
   end
 
-  def copy_selected_area
-    return @sel_area.dup
+  def copy_available_area
+    tiles_in_area = []
+    @sel_available.each {|tile| tiles_in_area << tile}
+    return tiles_in_area
+  end
+
+  def copy_targeted_area
+    tiles_in_area = []
+    @sel_area.each {|tile| tiles_in_area << tile}
+    return tiles_in_area
   end
 
 end # HexGrid

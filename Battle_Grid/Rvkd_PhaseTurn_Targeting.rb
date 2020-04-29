@@ -4,24 +4,107 @@
 #  This script handles target selection, tracking, and windows.
 #==============================================================================
 
-
 #=============================================================================
 # ■ Game_Action
 #=============================================================================
 class Game_Action
 
+  attr_reader :available_grid
+  attr_reader :targeted_grid
+  attr_reader :targets_initial
 
-  attr_reader :target_grid
-  def set_target_region(region)
-    @target_grid = region.is_a?(Array) ? region : []
+  # The tiles the item can be targeted at.
+  def set_available_region(region)
+    @available_grid = region.is_a?(Array) ? region : []
   end
 
-  attr_reader :targets_initial
+  # The tiles the item is aimed at.
+  def set_targeted_region(region)
+    @targeted_grid = region.is_a?(Array) ? region : []
+  end
+
+  # The units originally intended to be hit by the item.
   def set_initial_targets(units)
     @targets_initial = units
   end
 
+  # Call the grid version in battle; call original outside of battle.
+  alias rvkd_hexgrid_gaa_make_targets make_targets
+  def make_targets
+    return rvkd_hexgrid_gaa_make_targets unless subject.actor? # TODO: Enemy
+    return rvkd_hexgrid_gaa_make_targets if SceneManager.scene_is?(Scene_Menu)
+
+    if item.target_homing
+      targets = targets_initial
+    else
+      # Check for original target(s) in range
+      targets = PhaseTurn.units_in_area(@targeted_grid)
+      msgbox_p(targets.class)
+      msgbox_p(targets[0].class)
+
+      # Re-target if targets are empty and item is retargetable
+      if targets.empty? && item.retargetable
+        available_targets = PhaseTurn.units_in_area(@available_grid)
+        targets = [available_targets.sample] unless available_targets.empty?
+      end
+    end
+
+    return targets
+  end
+
 end # Game_Action
+
+#=============================================================================
+# ■ RPG::UsableItem
+#=============================================================================
+class RPG::UsableItem < RPG::BaseItem
+
+  # Whether the skill will not retarget upon execution
+  def target_homing
+    return @target_homing unless @target_homing.nil?
+    return false if @target_homing == false
+    @target_homing = grid_selectable_tags.include?(:homing)
+    return @target_homing
+  end
+
+  # Whether the skill will choose a new target if original ones are dead.
+  def retargetable
+    return @retargetable unless @retargetable.nil?
+    return true if @retargetable == true
+    @retargetable = !grid_selectable_tags.include?(:no_retarget)
+    return @retargetable
+  end
+
+  def ability_range
+    return $1.to_i if self.note =~ /<grid[\s_]*range:[\s]*(\d+)>/i
+    return 1
+  end
+
+  def grid_selectable_tags
+    if self.note =~ /<grid[\s\_]*select:[\s]*(.+)>/i
+      return $1.split(%r{,\s*}).collect{|s| s.to_sym}
+    end
+    return [:radius]
+  end
+
+  def grid_area_tags
+    if self.note =~ /<grid[\s\_]*area:[\s]*(.+)>/i
+      return $1.split(%r{,\s*}).collect{|s| s.to_sym}
+    end
+    return []
+  end
+
+  def grid_target_type
+    case @scope
+    when 0                ; return :none
+    when 1, 2, 3, 4, 5, 6 ; return :enemy
+    when 7, 8             ; return :ally
+    when 9, 10            ; return :ally_dead
+    when 11               ; return :self
+    end
+  end
+
+end # RPG::UsableItem
 
 #=============================================================================
 # ■ Scene_Battle
@@ -75,8 +158,10 @@ class Scene_Battle < Scene_Base
 
   def on_target_ok
     # primitive set: need to calculate area from ability with anchor point
-    BattleManager.actor.input.set_target_region(@hex_grid.copy_selected_area)
-    BattleManager.actor.input.set_initial_targets(@hex_grid.get_selected_units)
+    action = BattleManager.actor.input
+    action.set_available_region(@hex_grid.copy_available_area)
+    action.set_targeted_region(@hex_grid.copy_targeted_area)
+    action.set_initial_targets(@hex_grid.get_selected_units)
     create_timeslot_action(BattleManager.actor, BattleManager.actor.input)
     @target_window.cancel_target_selection
     @hex_grid.set_phase(:idle)

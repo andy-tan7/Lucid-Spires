@@ -32,6 +32,10 @@ module PhaseTurn
     @hex_grid.remove_unit(unit)
   end
 
+  def self.units_in_area(tiles)
+    return Revoked::Grid.units_in_area(@hex_grid, tiles)
+  end
+
   def self.insert_timeslot_event(event)
     raise "Event time is before current time" if event.time < current_time
     # Add to the very start if there is no preparation time.
@@ -465,38 +469,5 @@ class RPG::UsableItem < RPG::BaseItem
     return false
   end
 
-  def ability_range
-    return $1.to_i if self.note =~ /<grid[\s_]*range:[\s]*(\d+)>/i
-    return 1
-  end
-
-  def grid_selectable_tags
-    if self.note =~ /<grid[\s\_]*select:[\s]*(.+)>/i
-      return $1.split(%r{,\s*}).collect{|s| s.to_sym}
-    end
-    return [:radius]
-  end
-
-  def grid_area_tags
-    if self.note =~ /<grid[\s\_]*area:[\s]*(.+)>/i
-      return $1.split(%r{,\s*}).collect{|s| s.to_sym}
-    end
-    return []
-  end
-
-  def grid_target_type
-    case @scope
-    when 0 # none
-      return :none
-    when 1, 2, 3, 4, 5, 6 # enemy
-      return :enemy
-    when 7, 8 # one ally
-      return :ally
-    when 9, 10
-      return :ally_dead
-    when 11 # the user
-      return :self
-    end
-  end
 
 end
