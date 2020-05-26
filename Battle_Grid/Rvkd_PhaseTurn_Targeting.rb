@@ -39,8 +39,6 @@ class Game_Action
     else
       # Check for original target(s) in range
       targets = PhaseTurn.units_in_area(@targeted_grid)
-      msgbox_p(targets.class)
-      msgbox_p(targets[0].class)
 
       # Re-target if targets are empty and item is retargetable
       if targets.empty? && item.retargetable

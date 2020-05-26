@@ -39,11 +39,11 @@ module TSBS
 
     "clement_attack" => [
     [],
-    [:pose, 2, 0, 12],
-    [:pose, 2, 1, 12],
+    #[:pose, 2, 0, 12],
+    #[:pose, 2, 1, 12],
     #[:move_to_target, 40, 0, 15, 0],
-    [:pose, 2, 8, 4],
-    [:pose, 1, 24, 12],
+    [:pose, 2, 8, 2],
+    [:pose, 1, 24, 10],
     [:show_anim],
     [:pose, 1, 25, 2],
     [:pose, 1, 25, 2],
