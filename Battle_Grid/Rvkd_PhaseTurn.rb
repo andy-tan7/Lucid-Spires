@@ -22,6 +22,7 @@ module PhaseTurn
     @current_time = 0
     @current_event = nil
     @hex_grid = []
+    @turn_display = nil
   end
 
   def self.set_grid(hex_grid)
@@ -37,30 +38,79 @@ module PhaseTurn
   end
 
   def self.insert_timeslot_event(event)
-    raise "Event time is before current time" if event.time < current_time
-    # Add to the very start if there is no preparation time.
-    if event.time == current_time
-      @schedule.unshift(event)
-    # Append if there is only one object.
-    elsif @schedule.size == 1
-      @schedule.push(event)
-    # Find the appropriate insertion point.
-    else
-      index = 0
-      while (index + 1) < @schedule.size
-        if can_insert(@schedule[index], @schedule[index + 1], event)
-          @schedule.insert(index + 1, event)
-        else
-          index += 1
-        end
-      end
-      @schedule.push(event) if event.time > @schedule.last.time
-    end
+    insert_at = get_insertion_index(event.time)
+    @schedule.insert(insert_at, event)
+    add_display_unit_event(insert_at, event)
+    # @schedule.push(event)
+    # @schedule.sort_by! {|e| e.time}
+    msgbox_p("Inserted #{event.time} #{event.battler.name} at index #{insert_at}.\n
+      New schedule: \n #{@event_display.debug_print_schedule}")
   end
+
+  def self.get_insertion_index(ins_time)
+    times = @schedule.collect {|events| events.time}
+
+    # O(logn) solution
+    lower = 0
+    upper = times.length - 1
+
+    return times.length if times.last < ins_time
+    return 0 if times.first > ins_time
+
+    while (lower <= upper)
+      mid = (lower + upper) / 2
+
+      if (times[mid] == ins_time)
+        mid += 1 while (times[mid] == ins_time)
+        return mid
+      elsif (times[mid] < ins_time)
+        return mid + 1 if (mid < times.length) && times[mid + 1] > ins_time
+        lower = mid + 1
+      elsif (times[mid] > ins_time)
+        return mid if mid > 0 && times[mid - 1] < ins_time
+        upper = mid - 1
+      end
+    end
+    raise "did not find insertion index"
+  end
+
+  # def self.insert_timeslot_event(event)
+  #   raise "Event time is before current time" if event.time < current_time
+  #   # Add to the very start if there is no prep or if its time is the shortest
+  #   if event.time == current_time || event.time < @schedule.first.time
+  #     @schedule.unshift(event)
+  #     #p("Inserted timeslot event at #{event.time}")
+  #     return
+  #   # Append if there is only one object.
+  #   elsif @schedule.size == 1
+  #     @schedule.push(event)
+  #     #p("Inserted timeslot event at #{event.time}")
+  #     return
+  #   # Append if the event time is later than the last scheduled time.
+  #   elsif event.time >= @schedule.last.time
+  #     @schedule.push(event)
+  #     #p("Inserted timeslot event at #{event.time}")
+  #     return
+  #   # Find the appropriate insertion point.
+  #   else
+  #     index = 0
+  #     while (index + 1) < @schedule.size
+  #       if can_insert(@schedule[index], @schedule[index + 1], event)
+  #         @schedule.insert(index + 1, event)
+  #         #p("Inserted timeslot event at #{event.time}")
+  #         return
+  #       else
+  #         index += 1
+  #       end
+  #     end
+  #   end
+  #   msgbox_p("Event at time #{event.time} not inserted.")
+  # end
 
   def self.start_new_phase(members, reset_timeslots = true)
     if reset_timeslots
       @schedule = calc_phase_start_order(members)
+      start_new_turn_display
     end
   end
 
@@ -109,7 +159,7 @@ module PhaseTurn
     return unless @current_event
     p("Schedule from #{@current_time} ---------------------------------------")
     cur = @current_event
-    p([cur.battler.name, cur.time, cur.type, cur.unit_type])
+    p("> #{cur.battler.name}, #{cur.time}, #{cur.type}, #{cur.unit_type}")
     @schedule.each {|ts|
       next unless ts.subject
       p("#{ts.battler.name}, #{ts.time}, #{ts.type}, #{ts.unit_type}")
@@ -250,6 +300,7 @@ class Scene_Battle < Scene_Base
   def next_command
     event = BattleManager.next_command
     if event
+      #p(event.time)
       PhaseTurn.p_schedule
       case event.type
       when :event
@@ -261,6 +312,7 @@ class Scene_Battle < Scene_Base
           start_actor_command_selection
         elsif event.battler.is_a?(Game_Enemy)
           queue_enemy_next_turn(event)
+          next_command
         end
       when :action
         # process execution
@@ -269,15 +321,17 @@ class Scene_Battle < Scene_Base
         @status_window.unselect
         @subject = nil
         BattleManager.action_start
+        event.battler.set_actions([event.action])
       end
     end
   end
 
   def queue_enemy_next_turn(time_slot_event)
+    #msgbox_p("Queueing enemy next turn")
     enemy = time_slot_event.battler
-    enemy.make_actions
+    action_array = enemy.prepare_actions
 
-    action = enemy.actions[0]
+    action = action_array[0]
 
     prep_time = action.prep_time
     reset_time = action.reset_time
@@ -287,6 +341,8 @@ class Scene_Battle < Scene_Base
 
     temp_action = Rvkd_TimeSlotAction.new(exec_time, enemy, action)
     temp_next_turn = Rvkd_TimeSlotTurn.new(next_turn_time, enemy)
+
+    PhaseTurn.finish_current_event
     PhaseTurn.insert_timeslot_event(temp_action)
     PhaseTurn.insert_timeslot_event(temp_next_turn)
   end
@@ -308,6 +364,7 @@ class Scene_Battle < Scene_Base
     # is this for display, or are these actions being used for real?
 
     # enqueue the action and the unit's next turn.
+    PhaseTurn.finish_current_event
     PhaseTurn.insert_timeslot_event(temp_action)
     PhaseTurn.insert_timeslot_event(temp_next_turn)
   end
@@ -323,9 +380,11 @@ class Scene_Battle < Scene_Base
 
     if @subject.current_action
       @subject.current_action.prepare
-      if @subject.current_action.valid?
-        @status_window.open
-        execute_action
+      if @subject.current_action
+        if @subject.current_action.valid?
+          @status_window.open
+          execute_action
+        end
       end
       @subject.remove_current_action
     end
@@ -341,6 +400,7 @@ class Scene_Battle < Scene_Base
     @log_window.display_current_state(@subject)
     @log_window.wait_and_clear
     BattleManager.judge_win_loss
+    PhaseTurn.finish_current_event
     next_command
   end
 
@@ -379,6 +439,7 @@ class << BattleManager
     end
 
     @current_event = PhaseTurn.next_event
+    #msgbox_p("current event is: #{@current_event.time} - #{@current_event.type}, #{@current_event.battler.name}")
     #@actor_index = $game_party.members.index(@current_event.battler)
     return @current_event
   end
@@ -426,6 +487,10 @@ class Game_Battler < Game_BattlerBase
     @current_reset_time = time
   end
 
+  def set_actions(actions)
+    @actions = actions
+  end
+
 end
 
 #=============================================================================
@@ -433,10 +498,21 @@ end
 #=============================================================================
 class Game_Enemy < Game_Battler
 
-  alias rvkd_phaseturn_gen_make_actions make_actions
-  def make_actions
-    rvkd_phaseturn_gen_make_actions
+  def prepare_actions
+    clear_actions
+    return unless movable?
+    act_arr = Array.new(make_action_times) { Game_Action.new(self) }
 
+    return if act_arr.empty?
+    action_list = enemy.actions.select {|a| action_valid?(a) }
+    return if action_list.empty?
+    rating_max = action_list.collect {|a| a.rating }.max
+    rating_zero = rating_max - 3
+    action_list.reject! {|a| a.rating <= rating_zero }
+    act_arr.each do |action|
+      action.set_enemy_action(select_enemy_action(action_list, rating_zero))
+    end
+    return act_arr
   end
 
 end

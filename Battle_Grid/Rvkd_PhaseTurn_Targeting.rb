@@ -136,12 +136,14 @@ class Scene_Battle < Scene_Base
 
   def on_skill_ok
     usable_item = @skill_window.item
+    @skill_window.hide
     BattleManager.actor.input.set_skill(usable_item.id)
     select_target_selection(BattleManager.actor, usable_item)
   end
 
   def on_item_ok
     usable_item = @item_window.item
+    @item_window.hide
     BattleManager.actor.input.set_item(usable_item.id)
     select_target_selection(BattleManager.actor, usable_item)
   end
@@ -174,9 +176,9 @@ class Scene_Battle < Scene_Base
     when :attack, :guard
       @actor_command_window.activate
     when :skill
-      @skill_window.activate
+      @skill_window.show.activate
     when :item
-      @item_window.activate
+      @item_window.show.activate
     end
     @hex_grid.set_phase(:input)
   end

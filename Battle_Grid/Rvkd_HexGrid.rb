@@ -138,6 +138,12 @@ class Spriteset_Battle
     @viewport1.z = 25
   end
 
+  alias rvkd_hexgrid_spb_dispose dispose
+  def dispose
+    rvkd_hexgrid_spb_dispose
+    dispose_grid
+  end
+
   # override: create_battleback1
   def create_battleback1
     @back1_sprite = Sprite.new(@viewport0)

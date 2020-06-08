@@ -1,4 +1,5 @@
 Rvkd_PhaseTurn
 Rvkd_PhaseTurn_Targeting
+Rvkd_PhaseTurn_Bar
 Rvkd_GridModule
 Rvkd_HexGrid

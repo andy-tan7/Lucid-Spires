@@ -2,6 +2,11 @@ module Cache
   def self.grid(filename)
     load_bitmap("Graphics/Grid/", filename)
   end
+
+  def self.grid_turn(filename)
+    load_bitmap("Graphics/Grid/Turn/", filename)
+  end
+
 end
 
 module Sound
@@ -277,4 +282,4 @@ module Revoked
     end
 
   end # Grid module
-end
+end # Revoked module
