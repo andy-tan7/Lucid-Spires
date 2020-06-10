@@ -48,7 +48,7 @@ class Game_Enemy < Game_Battler
   alias rvkd_hexgrid_gen_die die
   def die
     rvkd_hexgrid_gen_die
-    PhaseTurn.remove_grid_unit(unit)
+    PhaseTurn.remove_grid_unit(self)
   end
 
 end

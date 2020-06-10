@@ -64,7 +64,7 @@ module TSBS
   # ===========================================================================
     TotalHit_Vocab = "Total Hit"            # Info 1
     TotalHit_Color = Color.new(230,230,50)  # Info 2
-    TotalHit_Pos   = [[51,10],[110,66]]     # Info 3
+    TotalHit_Pos   = [[51,780],[880,62]]     # Info 3
     TotalHit_Size  = 24                     # Info 4
   # ---------------------------------------------------------------------------
   # this setting for showing the hit counter. for more information see the
@@ -86,7 +86,7 @@ module TSBS
   # ===========================================================================
     TotalDamage_Vocab = "Damage"                # Info 1
     TotalDamage_Color = Color.new(255,150,150)  # Info 2
-    TotalDamage_Pos   = [[75,10],[110,90]]      # Info 3
+    TotalDamage_Pos   = [[80,770],[875,94]]      # Info 3
     TotalDamage_Size  = 24                      # Info 4
   # ---------------------------------------------------------------------------
   # this setting for showing the damage counter. for more information see the

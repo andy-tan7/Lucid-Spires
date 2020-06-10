@@ -22,7 +22,7 @@ module PhaseTurn
     @current_time = 0
     @current_event = nil
     @hex_grid = []
-    @turn_display = nil
+    @event_display = nil
   end
 
   def self.set_grid(hex_grid)
@@ -31,6 +31,7 @@ module PhaseTurn
 
   def self.remove_grid_unit(unit)
     @hex_grid.remove_unit(unit)
+    remove_unit_events(unit)
   end
 
   def self.units_in_area(tiles)
@@ -38,28 +39,25 @@ module PhaseTurn
   end
 
   def self.insert_timeslot_event(event)
-    insert_at = get_insertion_index(event.time)
+    insert_at = get_insertion_index(event.time, @schedule.collect {|e| e.time})
     @schedule.insert(insert_at, event)
+
+    insert_at = get_insertion_index(event.time, @event_display.get_times_array)
+    #msgbox_p(@event_display.get_times_array)
     add_display_unit_event(insert_at, event)
-    # @schedule.push(event)
-    # @schedule.sort_by! {|e| e.time}
-    msgbox_p("Inserted #{event.time} #{event.battler.name} at index #{insert_at}.\n
-      New schedule: \n #{@event_display.debug_print_schedule}")
   end
 
-  def self.get_insertion_index(ins_time)
-    times = @schedule.collect {|events| events.time}
-
+  def self.get_insertion_index(ins_time, times)
+    #times = @schedule.collect {|events| events.time}
     # O(logn) solution
     lower = 0
     upper = times.length - 1
 
-    return times.length if times.last < ins_time
+    return times.length if times.empty? || times.last < ins_time
     return 0 if times.first > ins_time
 
     while (lower <= upper)
       mid = (lower + upper) / 2
-
       if (times[mid] == ins_time)
         mid += 1 while (times[mid] == ins_time)
         return mid
@@ -74,43 +72,10 @@ module PhaseTurn
     raise "did not find insertion index"
   end
 
-  # def self.insert_timeslot_event(event)
-  #   raise "Event time is before current time" if event.time < current_time
-  #   # Add to the very start if there is no prep or if its time is the shortest
-  #   if event.time == current_time || event.time < @schedule.first.time
-  #     @schedule.unshift(event)
-  #     #p("Inserted timeslot event at #{event.time}")
-  #     return
-  #   # Append if there is only one object.
-  #   elsif @schedule.size == 1
-  #     @schedule.push(event)
-  #     #p("Inserted timeslot event at #{event.time}")
-  #     return
-  #   # Append if the event time is later than the last scheduled time.
-  #   elsif event.time >= @schedule.last.time
-  #     @schedule.push(event)
-  #     #p("Inserted timeslot event at #{event.time}")
-  #     return
-  #   # Find the appropriate insertion point.
-  #   else
-  #     index = 0
-  #     while (index + 1) < @schedule.size
-  #       if can_insert(@schedule[index], @schedule[index + 1], event)
-  #         @schedule.insert(index + 1, event)
-  #         #p("Inserted timeslot event at #{event.time}")
-  #         return
-  #       else
-  #         index += 1
-  #       end
-  #     end
-  #   end
-  #   msgbox_p("Event at time #{event.time} not inserted.")
-  # end
-
   def self.start_new_phase(members, reset_timeslots = true)
     if reset_timeslots
       @schedule = calc_phase_start_order(members)
-      start_new_turn_display
+      start_new_event_display
     end
   end
 
@@ -153,6 +118,13 @@ module PhaseTurn
   def self.can_insert(first, second, add)
     return true if first.time < add.time && add.time < second.time
     return false
+  end
+
+  # Remove all events where the unit is the subject.
+  def self.remove_unit_events(unit)
+    rem_events = @schedule.select {|event| event.subject == unit}
+    @schedule -= rem_events
+    remove_multiple_events(rem_events)
   end
 
   def self.p_schedule
@@ -301,7 +273,7 @@ class Scene_Battle < Scene_Base
     event = BattleManager.next_command
     if event
       #p(event.time)
-      PhaseTurn.p_schedule
+      #PhaseTurn.p_schedule
       case event.type
       when :event
         #environmental?
@@ -327,7 +299,6 @@ class Scene_Battle < Scene_Base
   end
 
   def queue_enemy_next_turn(time_slot_event)
-    #msgbox_p("Queueing enemy next turn")
     enemy = time_slot_event.battler
     action_array = enemy.prepare_actions
 
@@ -342,9 +313,21 @@ class Scene_Battle < Scene_Base
     temp_action = Rvkd_TimeSlotAction.new(exec_time, enemy, action)
     temp_next_turn = Rvkd_TimeSlotTurn.new(next_turn_time, enemy)
 
-    PhaseTurn.finish_current_event
+    telegraph_ability
+    # Add the new action to the event chain.
     PhaseTurn.insert_timeslot_event(temp_action)
+    # Display the telegraphed move if enabled -- otherwise just wait frames.
+    telegraph_ability
+    # Remove the current turn event.
+    PhaseTurn.finish_current_event
+    # Add the unit's next turn to the event chain.
     PhaseTurn.insert_timeslot_event(temp_next_turn)
+  end
+
+  def telegraph_ability
+    30.times do
+      update_basic
+    end
   end
 
   # build a Rvkd_TimeSlotAction and enqueue it in the turn list. Needs:
@@ -363,9 +346,15 @@ class Scene_Battle < Scene_Base
 
     # is this for display, or are these actions being used for real?
 
+    telegraph_ability
     # enqueue the action and the unit's next turn.
-    PhaseTurn.finish_current_event
+    # Add the new action to the event chain.
     PhaseTurn.insert_timeslot_event(temp_action)
+    # Display the telegraphed move if enabled -- otherwise just wait frames.
+    telegraph_ability
+    # Remove the current turn event.
+    PhaseTurn.finish_current_event
+    # Add the unit's next turn to the event chain.
     PhaseTurn.insert_timeslot_event(temp_next_turn)
   end
 
