@@ -38,13 +38,25 @@ module PhaseTurn
     return Revoked::Grid.units_in_area(@hex_grid, tiles)
   end
 
+  def self.create_temp_events(actor, action)
+    exec_time = current_time + action.prep_time
+    next_turn_time = exec_time + action.reset_time
+
+    temp_action = Rvkd_TimeSlotAction.new(exec_time, actor, action)
+    temp_next_turn = Rvkd_TimeSlotTurn.new(next_turn_time, actor)
+
+    return [temp_action, temp_next_turn]
+  end
+
   def self.insert_timeslot_event(event)
+    insert_schedule_only(event)
+    insert_at = get_insertion_index(event.time, @event_display.get_times_array)
+    add_display_unit_event(insert_at, event)
+  end
+
+  def self.insert_schedule_only(event)
     insert_at = get_insertion_index(event.time, @schedule.collect {|e| e.time})
     @schedule.insert(insert_at, event)
-
-    insert_at = get_insertion_index(event.time, @event_display.get_times_array)
-    #msgbox_p(@event_display.get_times_array)
-    add_display_unit_event(insert_at, event)
   end
 
   def self.get_insertion_index(ins_time, times)
@@ -183,10 +195,13 @@ class Rvkd_TimeSlotAction < Rvkd_TimeSlotTurn
   attr_reader :action
   def initialize(time, battler, action)
     super(time, battler)
-    @action = action  # Game_Action
+    set_action(action)  # Game_Action
   end
 
   def type ; :action end
+  def set_action(action)
+    @action = action
+  end
 end
 
 #=============================================================================
@@ -313,10 +328,11 @@ class Scene_Battle < Scene_Base
     temp_action = Rvkd_TimeSlotAction.new(exec_time, enemy, action)
     temp_next_turn = Rvkd_TimeSlotTurn.new(next_turn_time, enemy)
 
-    telegraph_ability
+    telegraph_ability(15)
     # Add the new action to the event chain.
     PhaseTurn.insert_timeslot_event(temp_action)
     # Display the telegraphed move if enabled -- otherwise just wait frames.
+    Sound.play_grid_event_add
     telegraph_ability
     # Remove the current turn event.
     PhaseTurn.finish_current_event
@@ -324,8 +340,8 @@ class Scene_Battle < Scene_Base
     PhaseTurn.insert_timeslot_event(temp_next_turn)
   end
 
-  def telegraph_ability
-    30.times do
+  def telegraph_ability(time = 30)
+    time.times do
       update_basic
     end
   end
@@ -334,28 +350,20 @@ class Scene_Battle < Scene_Base
   # current time slot
   # setup time for action
   # keep track of next delay on actor
-  def create_timeslot_action(actor, action)
-    prep_time = action.prep_time
-    reset_time = action.reset_time
+  def queue_actor_next_turn(actor, action)
+    temp = PhaseTurn.get_temp_events
+    PhaseTurn.set_temp_tone(:regular)
 
-    exec_time = current_time + prep_time
-    next_turn_time = exec_time + reset_time
-
-    temp_action = Rvkd_TimeSlotAction.new(exec_time, actor, action)
-    temp_next_turn = Rvkd_TimeSlotTurn.new(next_turn_time, actor)
-
-    # is this for display, or are these actions being used for real?
-
-    telegraph_ability
+    temp[0].event.set_action(action)
     # enqueue the action and the unit's next turn.
     # Add the new action to the event chain.
-    PhaseTurn.insert_timeslot_event(temp_action)
+    PhaseTurn.insert_schedule_only(temp[0].event)
     # Display the telegraphed move if enabled -- otherwise just wait frames.
     telegraph_ability
     # Remove the current turn event.
     PhaseTurn.finish_current_event
     # Add the unit's next turn to the event chain.
-    PhaseTurn.insert_timeslot_event(temp_next_turn)
+    PhaseTurn.insert_schedule_only(temp[1].event)
   end
 
   # override

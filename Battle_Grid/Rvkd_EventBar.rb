@@ -9,6 +9,7 @@ module PhaseTurn
   Bar = {
     :x => 0,
     :y => 4,
+    :bar_init_x => -250,
 
     :time_width => 36,
     :time_font_size => 18,
@@ -27,6 +28,11 @@ module PhaseTurn
     :bar_width => 300,
     :bar_height => 27,
     :top_offset => 8,
+
+    :bar_tone => {
+      :regular => Tone.new,
+      :gold => Tone.new(168, 120, 16, 64),
+    }
   }
 
   def self.create_event_display(viewport)
@@ -57,8 +63,8 @@ module PhaseTurn
     raise "not implemented: add_event"
   end
 
-  def self.add_display_unit_event(index, event)
-    @event_display.create_unit_event(event, index)
+  def self.add_display_unit_event(index, event, tone = :regular)
+    @event_display.create_unit_event(event, index, tone)
   end
 
   def self.remove_display_event(rem_event)
@@ -82,8 +88,40 @@ module PhaseTurn
     @event_display.anim_remove_moving_element(element)
   end
 
+  # Given a timeslot event, add a temporary displayed event to the list.
+  def self.indicate_player_selected_event(event)
+    insert_at = get_insertion_index(event.time, @event_display.get_times_array)
+    @temp_display_action = add_display_unit_event(insert_at, event, :gold)
+  end
+
+  def self.indicate_player_selected_next_turn(event)
+    insert_at = get_insertion_index(event.time, @event_display.get_times_array)
+    @temp_display_next_turn = add_display_unit_event(insert_at, event, :gold)
+  end
+
+  def self.cancel_indicated_events
+    remove_display_event(@temp_display_action.event)
+    remove_display_event(@temp_display_next_turn.event)
+    @temp_display_action = nil
+    @temp_display_next_turn = nil
+  end
+
+  def self.get_temp_events
+    [@temp_display_action, @temp_display_next_turn]
+  end
+
+  def self.set_temp_tone(tone_symbol = :regular)
+    get_temp_events.each {|temp| temp.set_tone(tone_symbol) }
+  end
+
 end
 
+#=============================================================================
+# ■ Rvkd_EventDisplay
+#-----------------------------------------------------------------------------
+# The visual list of event elements, ordered by their time of exeucution.
+# This class handles creation and deletion of all event elements.
+#=============================================================================
 class Rvkd_EventDisplay
 
   attr_reader :moving_elements
@@ -93,40 +131,38 @@ class Rvkd_EventDisplay
     reset_display
   end
 
+  # Reset the event display, disposing all events.
   def reset_display
     dispose_events if @events
     @events = []
     @moving_elements = []
   end
 
-  # Create a bar for a unit's turn or action event.
-  def create_unit_event(event, index = nil)
-    # Create the unit icon and the time slot text.
-    bar = Rvkd_TurnBar.new(event, @viewport)
+  # Create a visual display bar for a unit's turn or action event.
+  def create_unit_event(event, index, tone)
     index = PhaseTurn.get_insertion_index(event.time, get_times_array)
-    #msgbox_p("Inserting index #{index} to #{get_times_array}")
-    #index = [@events.length, index].min
-
-    add_display_element(bar, index)
+    element = Rvkd_EventDisplay_Element.new(event, @viewport, index, tone)
+    add_display_element(element)
   end
 
   # Add a turn display element to the event list.
-  def add_display_element(element, index = nil)
-    index ||= @events.length
-    @events.insert(index, element)
-    @events.each_with_index {|ev, i| ev.change_index(i) if ev.index != i}
+  def add_display_element(element)
+    element.index ||= @events.length
+    @events.insert(element.index, element)
+    @events.each_with_index {|ev, i| ev.change_index(i) }
+    return element
   end
 
-  # Remove a single event from the event list.
-  def remove_display_element(event)
-    index = @events.find_index {|ev| ev.event == event }
+  # Remove a single element from the element list.
+  def remove_display_element(element)
+    index = @events.find_index {|ev| ev.event == element }
     raise "attempt to delete element not in the event list." unless index
 
     @moving_elements.delete(@events[index])
     @events[index].dispose
     @events.delete_at(index)
 
-    @events.each_with_index {|ev, i| ev.change_index(i) if ev.index != i}
+    @events.each_with_index {|ev, i| ev.change_index(i)}
   end
 
   # Remove multiple (potentially non-consecutive) elements and repair indices.
@@ -142,28 +178,31 @@ class Rvkd_EventDisplay
     @events.each_with_index {|ev, i| ev.change_index(i) if ev.index != i}
   end
 
+  # Recursively dispose of all elements in the display.
   def dispose_events ; @events.each {|event| event.dispose } end
 
   # Update any moving elements (slide animation).
   def update_display
-    @moving_elements.each {|element| element.update } if @moving_elements.any?
+    return unless @moving_elements.any?
+    @moving_elements.reverse_each {|element| element.update }
   end
 
+  # Get the array of event times (automatically sorted in increasing order).
   def get_times_array
     return @events.collect {|element| element.event.time }
   end
 
+  # Add an element to the list of known currently-moving elements.
   def anim_track_moving_element(element)
     @moving_elements.push(element) unless @moving_elements.include?(element)
   end
 
+  # Remove an element from the list of known currently-moving elements.
   def anim_remove_moving_element(element)
     @moving_elements.delete(element)
   end
 
-  def moving?
-    return @moving_elements > 0
-  end
+  def moving? ; return @moving_elements > 0 end
 
   def debug_print_schedule
     return @events.collect {|ev| "#{ev.time} #{ev.battler.name} #{ev.index}\n"}
@@ -171,34 +210,46 @@ class Rvkd_EventDisplay
 
 end
 
-class Rvkd_TurnBar
+#=============================================================================
+# ■ Rvkd_EventDisplay_Element
+#-----------------------------------------------------------------------------
+# A horizontally-tiling bar element in the event display list, showing the
+# event's time, actor, and possibly the prepared action. Has several forms:
+#  1. DECISION TURN: Short bar, indicating the battler's turn to input.
+#  2. ACTION TURN: Long bar, indicating the battler and their prepared action.
+#  3. BATTLE EVENT: Misc, indicates a timed environmental or other effect.
+#=============================================================================
+class Rvkd_EventDisplay_Element
 
-  attr_reader :index
-  attr_reader :moving
-  attr_reader :event
+  attr_accessor :index # The current index in the list for Y-axis positioning
+  attr_accessor :event # The Rvkd_TimeSlotEvent tied to this display element.
+  attr_reader :moving  # Whether this element is currently in motion.
   attr_reader :time #debug
   attr_reader :battler #debug
 
-  def initialize(event, viewport)
+  def initialize(event, viewport, index, tone)
     @event = event
     @battler = event.battler
     @action = event.type == :action ? event.action : nil
     @time = event.time
-    @index = nil
 
-    @cur_x = PhaseTurn::Bar[:x]
-    @cur_y = PhaseTurn::Bar[:y]
+    # Initialize movement and position
+    @cur_x = PhaseTurn::Bar[:bar_init_x]
+    @cur_y = calc_location_y(index)
     @goal_x = @cur_x
     @goal_y = @cur_y
     @moving = false
     @move_time = 0
 
+    # Initialize background sprite
     @shadow_bar = Sprite.new(viewport)
     @shadow_bar.bitmap = Cache.grid_turn("event_bg" +(@action ? "_long" : ""))
     @shadow_bar.x = @cur_x
     @shadow_bar.y = @cur_y
     @shadow_bar.z = 2
+    set_tone(tone)
 
+    # Initialize the battler icon.
     face_name = @battler.battle_event_bar_face
     @battler_face = Sprite.new(viewport)
     @battler_face.bitmap = Cache.grid_turn("turn_face" + face_name)
@@ -206,6 +257,7 @@ class Rvkd_TurnBar
     @battler_face.y = @cur_y + PhaseTurn::Bar[:face_y]
     @battler_face.z = 24
 
+    # Initialize any text to be drawn on the bar.
     @text_bar = Window_TurnBarText.new(@cur_x, @cur_y)
     @text_bar.draw_event_time(@time.truncate.to_s)
     if event.type == :action
@@ -213,16 +265,16 @@ class Rvkd_TurnBar
       @text_bar.draw_event_ability(i.icon_index, "#{@battler.name} #{i.name}")
     end
 
-    # if action
-    #   # Create the icon and text, and use the extended shadow bar.
-    # end
+    # Set the item to slide in when created.
+    change_index(index)
   end
 
   def change_index(index, time = 20)
-    # Skip movement if attempting to change to the same index.
+    # Skip if not sliding in, and attempting to change to the same index.
     return if index == @index
 
     @index = index
+    @goal_x = PhaseTurn::Bar[:x] unless @goal_x == PhaseTurn::Bar[:x]
     @goal_y = calc_location_y(index)
     PhaseTurn.anim_track_moving_element(self)
     @moving = true
@@ -238,13 +290,16 @@ class Rvkd_TurnBar
   def update
     return unless @moving
 
+    dist_x = @goal_x - @cur_x
     dist_y = @goal_y - @cur_y
+
+    mov_x = dist_x / @move_time
     mov_y = dist_y / @move_time
 
-    relocate_elements(0, mov_y)
+    relocate_elements(mov_x, mov_y)
     @move_time -= 1
 
-    if @move_time == 0 || @cur_y == @goal_y
+    if @move_time == 0 || (@cur_y == @goal_y && @cur_x == @goal_x)
       finish_moving
     end
   end
@@ -267,6 +322,11 @@ class Rvkd_TurnBar
     @move_time = 0
     msgbox_p("Movement skipped") if (@cur_y - @goal_y).abs > 10
     @cur_y = @goal_y
+  end
+
+  def set_tone(tone_symbol)
+    return unless @shadow_bar
+    @shadow_bar.tone = PhaseTurn::Bar[:bar_tone][tone_symbol]
   end
 
   def dispose

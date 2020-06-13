@@ -162,8 +162,8 @@ class Scene_Battle < Scene_Base
     action.set_available_region(@hex_grid.copy_available_area)
     action.set_targeted_region(@hex_grid.copy_targeted_area)
     action.set_initial_targets(@hex_grid.get_selected_units)
-    create_timeslot_action(BattleManager.actor, BattleManager.actor.input)
-    @target_window.cancel_target_selection
+    queue_actor_next_turn(BattleManager.actor, action)
+    @target_window.finish_target_selection(false)
     @hex_grid.set_phase(:idle)
     next_command
   end
@@ -171,7 +171,7 @@ class Scene_Battle < Scene_Base
   def on_target_cancel
     @target_window.deactivate
     @target_window.hide
-    @target_window.cancel_target_selection
+    @target_window.finish_target_selection(true)
     case @actor_command_window.current_symbol
     when :attack, :guard
       @actor_command_window.activate
@@ -200,6 +200,7 @@ class Window_GridTarget < Window_Command
   def initialize(battle_grid)
     super(0, 0)
     @battle_grid = battle_grid
+    @current_action = nil
     refresh
     self.openness = 0
     self.active = false
@@ -222,10 +223,17 @@ class Window_GridTarget < Window_Command
 
     @battle_grid.set_area_item(item)
     @battle_grid.setup_target_selection(cursor_t, available, potential, area)
+
+    dummy = Game_Action.new(battler)
+    item.is_a?(RPG::Skill) ? dummy.set_skill(item.id) : dummy.set_item(item.id)
+    temp = PhaseTurn.create_temp_events(battler, dummy)
+    PhaseTurn.indicate_player_selected_event(temp[0])
+    PhaseTurn.indicate_player_selected_next_turn(temp[1])
   end
 
-  def cancel_target_selection
-    @battle_grid.cancel_target_selection
+  def finish_target_selection(cancel)
+    @battle_grid.finish_target_selection
+    PhaseTurn.cancel_indicated_events if cancel
   end
 
   def process_handling

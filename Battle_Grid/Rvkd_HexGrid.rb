@@ -396,7 +396,7 @@ class HexGrid
     @sel_movable = available + potential
   end
 
-  def cancel_target_selection
+  def finish_target_selection
     reset_tiles(all_tiles)
     @area_item = nil
     @sel_area.clear

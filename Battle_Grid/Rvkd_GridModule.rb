@@ -16,6 +16,9 @@ module Sound
   def self.play_grid_move
     RPG::SE.new("FEA - Pop2", 80, 90).play
   end
+  def self.play_grid_event_add
+    RPG::SE.new("TBS_BATTLE_LIST", 60, 85).play
+  end
 end
 
 module Revoked
