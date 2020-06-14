@@ -17,7 +17,10 @@ module Sound
     RPG::SE.new("FEA - Pop2", 80, 90).play
   end
   def self.play_grid_event_add
-    RPG::SE.new("TBS_BATTLE_LIST", 60, 85).play
+    RPG::SE.new("TBS_BATTLE_LIST", 80, 85).play
+  end
+  def self.play_grid_confirm
+    RPG::SE.new("TBS_BATTLE_LIST", 90, 85).play
   end
 end
 

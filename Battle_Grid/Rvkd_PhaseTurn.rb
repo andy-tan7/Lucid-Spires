@@ -50,13 +50,17 @@ module PhaseTurn
 
   def self.insert_timeslot_event(event)
     insert_schedule_only(event)
-    insert_at = get_insertion_index(event.time, @event_display.get_times_array)
-    add_display_unit_event(insert_at, event)
+    ins_at = 1 if event.time == @current_time
+    ins_at ||= get_insertion_index(event.time, @event_display.get_times_array)
+
+    add_display_unit_event(ins_at, event)
   end
 
   def self.insert_schedule_only(event)
-    insert_at = get_insertion_index(event.time, @schedule.collect {|e| e.time})
-    @schedule.insert(insert_at, event)
+    ins_at = 0 if event.time == @current_time
+    ins_at ||= get_insertion_index(event.time, @schedule.collect {|e| e.time})
+
+    @schedule.insert(ins_at, event)
   end
 
   def self.get_insertion_index(ins_time, times)
@@ -185,7 +189,6 @@ class Rvkd_TimeSlotTurn < Rvkd_TimeSlotEvent
     return Game_Enemy if battler.is_a?(Game_Enemy)
     return nil
   end
-
 end
 
 #=============================================================================
@@ -195,13 +198,17 @@ class Rvkd_TimeSlotAction < Rvkd_TimeSlotTurn
   attr_reader :action
   def initialize(time, battler, action)
     super(time, battler)
+    @revealed = battler.actor?
     set_action(action)  # Game_Action
   end
 
-  def type ; :action end
   def set_action(action)
     @action = action
   end
+
+  def type ; :action end
+  def reveal ; @revealed = true end
+  def hide ; @revealed = false end
 end
 
 #=============================================================================
@@ -396,9 +403,9 @@ class Scene_Battle < Scene_Base
     @log_window.wait_and_clear
     @log_window.display_current_state(@subject)
     @log_window.wait_and_clear
-    BattleManager.judge_win_loss
     PhaseTurn.finish_current_event
-    next_command
+    BattleManager.judge_win_loss
+    next_command if BattleManager.phase
   end
 
 end # Scene_Battle
@@ -407,6 +414,8 @@ end # Scene_Battle
 # ■ BattleManager
 #=============================================================================
 class << BattleManager
+
+  attr_reader :phase
 
   alias rvkd_phaseturn_bmg_init_members init_members
   def init_members

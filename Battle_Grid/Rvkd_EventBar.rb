@@ -90,13 +90,15 @@ module PhaseTurn
 
   # Given a timeslot event, add a temporary displayed event to the list.
   def self.indicate_player_selected_event(event)
-    insert_at = get_insertion_index(event.time, @event_display.get_times_array)
-    @temp_display_action = add_display_unit_event(insert_at, event, :gold)
+    ins_at = event.time == @current_time ? 1 : nil
+    ins_at ||= get_insertion_index(event.time, @event_display.get_times_array)
+    @temp_display_action = add_display_unit_event(ins_at, event, :gold)
   end
 
   def self.indicate_player_selected_next_turn(event)
-    insert_at = get_insertion_index(event.time, @event_display.get_times_array)
-    @temp_display_next_turn = add_display_unit_event(insert_at, event, :gold)
+    ins_at = event.time == @current_time ? 1 : nil
+    ins_at ||= get_insertion_index(event.time, @event_display.get_times_array)
+    @temp_display_next_turn = add_display_unit_event(ins_at, event, :gold)
   end
 
   def self.cancel_indicated_events
@@ -140,7 +142,7 @@ class Rvkd_EventDisplay
 
   # Create a visual display bar for a unit's turn or action event.
   def create_unit_event(event, index, tone)
-    index = PhaseTurn.get_insertion_index(event.time, get_times_array)
+    index ||= PhaseTurn.get_insertion_index(event.time, get_times_array)
     element = Rvkd_EventDisplay_Element.new(event, @viewport, index, tone)
     add_display_element(element)
   end
@@ -223,7 +225,8 @@ class Rvkd_EventDisplay_Element
 
   attr_accessor :index # The current index in the list for Y-axis positioning
   attr_accessor :event # The Rvkd_TimeSlotEvent tied to this display element.
-  attr_reader :moving  # Whether this element is currently in motion.
+  attr_reader :moving  # Whether this element is currently changing index.
+  attr_reader :revealing
   attr_reader :time #debug
   attr_reader :battler #debug
 

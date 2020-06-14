@@ -217,7 +217,7 @@ class HexGrid
   end
 
   def dispose_grid
-    @grid.each {|tile| tile.dispose }
+    @grid.each_value {|row| row.each_value {|tile| tile.dispose }}
   end
 
   def cursor_movable? ; @phase == :selection ; end

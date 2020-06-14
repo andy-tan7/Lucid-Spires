@@ -246,7 +246,7 @@ class Window_GridTarget < Window_Command
   def process_ok
     targets = @battle_grid.get_selected_units
     if (!targets.nil? && !targets.empty?)
-      Sound.play_ok
+      Sound.play_grid_confirm
       Input.update
       deactivate
       call_ok_handler
