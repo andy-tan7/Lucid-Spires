@@ -166,9 +166,11 @@ class Rvkd_TimeSlotEvent
     @time = time
   end
 
+  def revealed? ; false ; end
   def subject ; nil ; end
   def phase ; timeslot / PhaseTurn::Calc::PHASE_DURATION ; end
   def type ; :event ; end
+  def icon ; nil ; end
 end
 
 #=============================================================================
@@ -198,7 +200,7 @@ class Rvkd_TimeSlotAction < Rvkd_TimeSlotTurn
   attr_reader :action
   def initialize(time, battler, action)
     super(time, battler)
-    @revealed = battler.actor?
+    @revealed = battler.actions_revealed?
     set_action(action)  # Game_Action
   end
 
@@ -207,6 +209,8 @@ class Rvkd_TimeSlotAction < Rvkd_TimeSlotTurn
   end
 
   def type ; :action end
+  def icon ; @action.item ? @action.item.icon_index : nil ; end
+  def revealed? ; @revealed ; end
   def reveal ; @revealed = true end
   def hide ; @revealed = false end
 end
@@ -314,10 +318,21 @@ class Scene_Battle < Scene_Base
         @actor_command_window.close
         @status_window.unselect
         @subject = nil
-        BattleManager.action_start
-        event.battler.set_actions([event.action])
+        start_next_action(event)
       end
     end
+  end
+
+  def start_next_action(event)
+    telegraph_ability(15)
+    display_element = PhaseTurn.get_display_element_from_event(event)
+    unless display_element.player_revealed
+      display_element.reveal_action
+      telegraph_ability(15)
+    end
+
+    BattleManager.action_start
+    event.battler.set_actions([event.action])
   end
 
   def queue_enemy_next_turn(time_slot_event)
@@ -497,6 +512,20 @@ class Game_Battler < Game_BattlerBase
     @actions = actions
   end
 
+  def actions_revealed?
+    return true if actor?
+    return states.any? {|state| state.reveal_actions? == true }
+  end
+
+  # Add a phase turn event bar update check for when a Reveal state is changed
+  alias rvkd_phaseturn_gbt_item_apply item_apply
+  def item_apply(user, item)
+    rvkd_phaseturn_gbt_item_apply(user, item)
+    if SceneManager.scene_is?(Scene_Battle) && @result.need_refresh_event_bar?
+      PhaseTurn.refresh_revealed_events
+    end
+  end
+
 end
 
 #=============================================================================
@@ -551,5 +580,24 @@ class RPG::UsableItem < RPG::BaseItem
     return false
   end
 
+end
+
+#=============================================================================
+# ■ RPG::State
+#=============================================================================
+class RPG::State < RPG::BaseItem
+
+  def reveal_actions?
+    return @reveal_actions if @reveal_actions
+    @reveal_actions = self.note =~ /<reveal[\s_]*actions>/i
+  end
+
+end
+
+class Game_ActionResult
+
+  def need_refresh_event_bar?
+    return (@added_states + @removed_states).any? {|s| s && s.reveal_actions?}
+  end
 
 end
