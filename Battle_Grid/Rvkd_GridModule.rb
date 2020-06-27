@@ -1,15 +1,29 @@
+#==============================================================================
+# Grid Shift Phase Turn Battle System - Grid Module
+#------------------------------------------------------------------------------
+#  This script handles and abstracts grid-related calculations and pathfinding.
+#==============================================================================
+# ■ Cache
+#==============================================================================
 module Cache
+  #---------------------------------------------------------------------------
+  # * Get grid graphics
+  #---------------------------------------------------------------------------
   def self.grid(filename)
     load_bitmap("Graphics/Grid/", filename)
   end
-
   def self.grid_turn(filename)
     load_bitmap("Graphics/Grid/Turn/", filename)
   end
+end # module Cache
 
-end
-
+#=============================================================================
+# ■ Sound
+#=============================================================================
 module Sound
+  #---------------------------------------------------------------------------
+  # * Custom grid sound effects
+  #---------------------------------------------------------------------------
   def self.play_grid_error
     RPG::SE.new("FEA - Error1", 60, 95).play
   end
@@ -22,8 +36,11 @@ module Sound
   def self.play_grid_confirm
     RPG::SE.new("TBS_BATTLE_LIST", 90, 85).play
   end
-end
+end # module Cache
 
+#=============================================================================
+# ■ Revoked::Grid
+#=============================================================================
 module Revoked
   module Grid
 
@@ -47,10 +64,9 @@ module Revoked
       3 => [1,1], # Vermund
       4 => [-1,3] # Rinore
     }
-
     #--------------------------------------------------------------------------
     # ■ Get array of spaces based on an item's grid tags and any battler mods.
-    #==========================================================================
+    #--------------------------------------------------------------------------
     def self.position(row, col)
       result = {}
 
@@ -65,7 +81,9 @@ module Revoked
 
       return result
     end
-
+    #--------------------------------------------------------------------------
+    # Get grid row/col coordinates from screen graphical x/y coordinates.
+    #--------------------------------------------------------------------------
     def self.coordinates_from_pos(x_pos, y_pos)
       max_row = Revoked::Grid::RadiusY
       max_col = Revoked::Grid::RadiusX
@@ -79,19 +97,24 @@ module Revoked
 
       return [row,col]
     end
-
+    #--------------------------------------------------------------------------
     # Return the min and max x (column) value on a given row.
+    #--------------------------------------------------------------------------
     def self.column_boundary(row)
       base = Revoked::Grid::RadiusX
       min = -base - (row < 0 ? row : 0)
       max = base - (row > 0 ? row : 0)
       return {:min => min, :max => max}
     end
-
+    #--------------------------------------------------------------------------
+    # Return the integer tile distance between two tile objects.
+    #--------------------------------------------------------------------------
     def self.distance_between_tile(dest, orig)
       return distance_between_rc(dest.coordinates_rc, orig.coordinates_rc)
     end
-
+    #--------------------------------------------------------------------------
+    # Return the integer tile distance between a given row/col pair.
+    #--------------------------------------------------------------------------
     def self.distance_between_rc(dest, orig)
       z_dest = calc_depth(*dest)
       z_orig = calc_depth(*orig)
@@ -104,16 +127,17 @@ module Revoked
 
       return delta.values.max
     end
-
-    # return the coordinate of the third axis for distance calculation.
+    #--------------------------------------------------------------------------
+    # Calculate the coordinate of the third axis for distance calculation.
+    #--------------------------------------------------------------------------
     def self.calc_depth(row, col)
       return (row + col) * -1
     end
-
   #----------------------------------------------------------------------------
   # Area building methods (Returns coordinates).
   #============================================================================
-    # get the indices of all nearby tiles with a given radius. [y, x]
+    # Get the indices of all tiles within a given radius. [y, x]
+    #--------------------------------------------------------------------------
     def self.calc_radius(tile_index = [0,0], radius = 1)
       offset_x = tile_index[1]
       offset_y = tile_index[0]
@@ -121,7 +145,6 @@ module Revoked
       radius_y = radius
 
       result = []
-
       (-radius_y..radius_y).each do |row|
         left_ind  = row < 0 ? -radius_x - row : -radius_x
         right_ind = row > 0 ? radius_x - row : radius_x
@@ -132,15 +155,15 @@ module Revoked
       end
       return result
     end
-
-    # get indices of a tile and adjacent ones in a curve based on direction.
+    #--------------------------------------------------------------------------
+    # Get indices of a tile and adjacent ones in a curve based on direction.
+    #--------------------------------------------------------------------------
     def self.calc_arc(origin_rc, direction, range = 1)
       # direction can be :left or :right.
       offset_x = origin_rc[1]
       offset_y = origin_rc[0]
 
       result = []
-
       dir = :right ? 1 : -1
       if direction == :right
         range.times do |i|
@@ -156,10 +179,10 @@ module Revoked
         end
       end
       return result
-
     end
-
-    # get array of spaces based on an item's grid tags and any battler mods.
+    #--------------------------------------------------------------------------
+    # Get array of player-selectable spaces from grid tags and battler stats.
+    #--------------------------------------------------------------------------
     def self.make_interact_tiles(grid, origin, item)
       range = item.ability_range
 
@@ -178,11 +201,13 @@ module Revoked
           selectable += grid.tiles_from_coordinates(calc_arc(origin,dir,range))
         end
       end
-
+      # Can add battler stats to influence the AoE.
       selectable.uniq!
       return {:available => selectable, :potential => []}
     end
-
+    #--------------------------------------------------------------------------
+    # Get array of AoE tiles anchored off of the origin.
+    #--------------------------------------------------------------------------
     def self.make_area_tiles(grid, offset_t, item)
       offset_rc = offset_t.coordinates_rc
       area = []
@@ -203,7 +228,10 @@ module Revoked
       area.uniq!
       return area
     end
-
+    #--------------------------------------------------------------------------
+    # Compute the default/initial cursor position when selecting an ability.
+    # Defaults to the nearest target for convenience.
+    #--------------------------------------------------------------------------
     def self.auto_cursor(grid, origin, selectable, item)
       anchor_coordinates = []
       target_type = item.grid_target_type
@@ -230,22 +258,22 @@ module Revoked
       anchor_coordinates = targets_in_range[0][1][1]
       return anchor_coordinates
     end
-
-    # return an array of battlers in the given region.
+    #--------------------------------------------------------------------------
+    # Return an array of battlers in the given region.
+    #--------------------------------------------------------------------------
     def self.units_in_area(grid, tiles)
       units = tiles.collect {|tile| tile.unit_contents }.compact.uniq.flatten
       return units
     end
-
-    # return an array of enemy, distance, tile trios.
+    #--------------------------------------------------------------------------
+    # Return an array of enemy, distance, tile trios.
+    #--------------------------------------------------------------------------
     def self.unit_distances_in_area(grid, tiles, origin)
       units = {}
       tiles.each do |tile|
         battlers = tile.unit_contents
         battlers.each do |b|
           dist = distance_between_tile(tile, grid.get(*origin))
-          # msgbox_p(dist, [dist, units[b][0]].min) if units[b] && units[b][0] != nil
-          # units[b] = !units[b] ? [dist, tile] : [[dist, units[b][0]].min, tile]
           if units[b].nil?
             units[b] = [dist, tile]
           else
@@ -256,12 +284,8 @@ module Revoked
 
       unit_array = units.to_a
       unit_array.sort_by {|_,dist| dist[0] }.reverse
-      # unit_array.each {|u|
-      #   msgbox_p("dist: #{u[1][0]}, coordinate: #{u[1][1].coordinates_rc}")
-      # }
       return unit_array
     end
-
     #--------------------------------------------------------------------------
     # ■ Grid battler location calculations.
     #==========================================================================
@@ -289,3 +313,9 @@ module Revoked
 
   end # Grid module
 end # Revoked module
+
+#==============================================================================
+#
+# ▼ End of File
+#
+#==============================================================================
