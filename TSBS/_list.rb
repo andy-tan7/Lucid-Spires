@@ -5,4 +5,5 @@ TSBS - Implementation
 Kaduki Move Addons
 Sequence - Clement
 Sequence - Enemies
+YAMI Damage Popup
 Rvkd_TSBSGrid

@@ -619,7 +619,8 @@ class Game_ActionResult
   # Calls for an event display bar refresh when a 'reveal' state is changed.
   #---------------------------------------------------------------------------
   def need_refresh_event_bar?
-    return (@added_states + @removed_states).any? {|s| s && s.reveal_actions?}
+    arr = @added_states + @removed_states
+    return arr.any? {|s| $data_states[s].reveal_actions?}
   end
 end # Game_ActionResult
 
@@ -666,7 +667,8 @@ class RPG::State < RPG::BaseItem
   #---------------------------------------------------------------------------
   def reveal_actions?
     return @reveal_actions if @reveal_actions
-    @reveal_actions = self.note =~ /<reveal[\s_]*actions>/i
+    @reveal_actions = (self.note =~ /<reveal[\s_]*actions>/i) != nil
+    return @reveal_actions
   end
 end # RPG::State
 
