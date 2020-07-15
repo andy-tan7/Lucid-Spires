@@ -11,6 +11,7 @@ class Game_Battler < Game_BattlerBase
     @grid_coordinates = locations
   end
 
+  def grid_size ; 1 end
   def grid_row ; @grid_coordinates[0][0] end
   def grid_col ; @grid_coordinates[0][1] end
   def grid_coordinates ; @grid_coordinates end
@@ -105,29 +106,7 @@ class Game_Troop
   #---------------------------------------------------------------------------
   def setup_grid_positions(hex_grid)
     members.each do |member|
-      # grid_height = 1 + 2 * (Revoked::Grid::RadiusY)
-      x_pos = member.screen_x
-      y_pos = member.screen_y
-      xf = Revoked::Grid::TileWidth
-      yf = Revoked::Grid::TileHeight
-
-      mem_size = member.grid_size
-
-      cds = []
-      case mem_size
-      when 1
-        cds << Revoked::Grid.coordinates_from_pos(x_pos, y_pos)
-      when 2
-        cds << Revoked::Grid.coordinates_from_pos(x_pos - xf/2, y_pos)
-        cds << Revoked::Grid.coordinates_from_pos(x_pos + xf/2, y_pos)
-      when 4
-        cds << Revoked::Grid.coordinates_from_pos(x_pos - xf/2, y_pos - yf/2)
-        cds << Revoked::Grid.coordinates_from_pos(x_pos + xf/2, y_pos - yf/2)
-        cds << Revoked::Grid.coordinates_from_pos(x_pos - xf/2, y_pos + yf/2)
-        cds << Revoked::Grid.coordinates_from_pos(x_pos + xf/2, y_pos + yf/2)
-      else
-        cds.push(Revoked::Grid.coordinates_from_pos(x_pos, y_pos))
-      end
+      cds = Revoked::Grid.troop_battler_coordinates(member)
       sum_x = 0
       sum_y = 0
       cds.each do |pair|

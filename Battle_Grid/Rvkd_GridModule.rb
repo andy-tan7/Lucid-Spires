@@ -98,6 +98,34 @@ module Revoked
       return [row,col]
     end
     #--------------------------------------------------------------------------
+    # Get a battler's coordinate array based on its grid size.
+    #--------------------------------------------------------------------------
+    def self.troop_battler_coordinates(battler)
+      x_pos = battler.screen_x
+      y_pos = battler.screen_y
+      xf = Revoked::Grid::TileWidth
+      yf = Revoked::Grid::TileHeight
+      mem_size = battler.grid_size
+      cds = []
+
+      case mem_size
+      when 1
+        cds << Revoked::Grid.coordinates_from_pos(x_pos, y_pos)
+      when 2
+        cds << Revoked::Grid.coordinates_from_pos(x_pos - xf/2, y_pos)
+        cds << Revoked::Grid.coordinates_from_pos(x_pos + xf/2, y_pos)
+      when 4
+        cds << Revoked::Grid.coordinates_from_pos(x_pos - xf/2, y_pos - yf/2)
+        cds << Revoked::Grid.coordinates_from_pos(x_pos + xf/2, y_pos - yf/2)
+        cds << Revoked::Grid.coordinates_from_pos(x_pos - xf/2, y_pos + yf/2)
+        cds << Revoked::Grid.coordinates_from_pos(x_pos + xf/2, y_pos + yf/2)
+      else
+        cds.push(Revoked::Grid.coordinates_from_pos(x_pos, y_pos))
+      end
+
+      return cds
+    end
+    #--------------------------------------------------------------------------
     # Return the min and max x (column) value on a given row.
     #--------------------------------------------------------------------------
     def self.column_boundary(row)
@@ -199,6 +227,8 @@ module Revoked
           selectable += grid.tiles_from_coordinates(calc_radius(origin, range))
         when :arc
           selectable += grid.tiles_from_coordinates(calc_arc(origin,dir,range))
+        when :not_self # Keep this at the end to omit the origin tile.
+          selectable -= [origin]
         end
       end
       # Can add battler stats to influence the AoE.
