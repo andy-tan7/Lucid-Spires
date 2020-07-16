@@ -159,6 +159,20 @@ module PhaseTurn
   def self.units_in_area(tiles)
     return Revoked::Grid.units_in_area(@hex_grid, tiles)
   end
+  #---------------------------------------------------------------------------
+  # Relocate a unit.
+  #---------------------------------------------------------------------------
+  def self.move_unit(unit, new_tiles)
+    return unless @hex_grid
+
+    @hex_grid.relocate_unit_tiles(unit, new_tiles)
+  end
+
+  def self.move_command(actor)
+    msgbox_p("123")
+    #msgbox_p(actor.current_action.targeted_grid)
+    move_unit(actor, actor.current_action.targeted_grid)
+  end
 
   # Debug method
   def self.p_schedule

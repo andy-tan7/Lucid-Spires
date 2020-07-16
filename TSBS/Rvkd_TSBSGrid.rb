@@ -26,8 +26,60 @@ class Sprite_BattlerShadow < Sprite
   end
 end
 
+class Game_Battler < Game_BattlerBase
+  #
+  #alias rvkd_grid_tsbs_gb_setup_reset setup_reset
+  def setup_reset
+    p("! ------ Resetting ----------")
+    p(@ori_x, @ori_y)
+    @ori_x = self.original_x
+    @ori_y = self.original_y
+    p(@ori_x, @ori_y)
+    stop_all_movements
+    goto(@ori_x, @ori_y, @acts[1], @acts[2])
+    #rvkd_grid_tsbs_gb_setup_reset
+  end
+
+  def original_x
+    len = grid_coordinates.size
+    avg_r = grid_coordinates.collect{|p| p[0]}.inject{|s,r| s + r}.to_f / len
+    avg_c = grid_coordinates.collect{|p| p[1]}.inject{|s,c| s + c}.to_f / len
+    unit_x = Revoked::Grid.position(avg_r, avg_c)[:x]
+    unit_x += Revoked::Grid::UnitXOffset
+    return unit_x
+  end
+
+  def original_y
+    len = grid_coordinates.size
+    avg_r = grid_coordinates.collect{|p| p[0]}.inject{|s,r| s + r}.to_f / len
+    avg_c = grid_coordinates.collect{|p| p[1]}.inject{|s,c| s + c}.to_f / len
+    unit_y = Revoked::Grid.position(avg_r, avg_c)[:y]
+    unit_y += Revoked::Grid::UnitYOffset
+    return unit_y
+  end
+end
+
+class Game_Actor < Game_Battler
+  #override
+  def original_x
+    unit_x = Revoked::Grid.position(grid_row, grid_col)[:x]
+    unit_x += Revoked::Grid::UnitXOffset
+    return unit_x
+  end
+  #override
+  def original_y
+    unit_y = Revoked::Grid.position(grid_row, grid_col)[:y]
+    unit_y += Revoked::Grid::UnitYOffset
+    return unit_y
+  end
+end
 
 class Game_Enemy < Game_Battler
+
+  # def original_x
+  # end
+  # def original_y
+  # end
 
   def shadow_name
     return @shadow_name if @shadow_name

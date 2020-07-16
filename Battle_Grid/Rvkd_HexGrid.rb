@@ -22,22 +22,13 @@ end
 # ■ Game_Actor
 #=============================================================================
 class Game_Actor < Game_Battler
-  def original_x
-    unit_x = Revoked::Grid.position(*@grid_coordinates[0])[:x]
-    unit_x += Revoked::Grid::UnitXOffset
-    return unit_x
-  end
 
-  def original_y
-    unit_y = Revoked::Grid.position(*@grid_coordinates[0])[:y]
-    unit_y += Revoked::Grid::UnitYOffset
-    return unit_y
-  end
 
-  def set_grid_coordinates(grid_row, grid_col)
-    @grid_coordinates = [[grid_row, grid_col]]
+  def set_grid_coordinates(row, col)
+    @grid_coordinates = [[row, col]]
   end
-  def grid_coordinates ; @grid_coordinates[0] end
+  def grid_coordinates ; @grid_coordinates ; end
+
 end # Game_Actor
 
 #=============================================================================
@@ -92,7 +83,7 @@ class Game_Party
   def setup_grid_positions(hex_grid)
     members.each do |member|
       coordinates = member.grid_coordinates
-      hex_grid.get(*coordinates).add_unit(member)
+      coordinates.each {|pair| hex_grid.get(*pair).add_unit(member) }
     end
   end
 end # Game_Party
@@ -106,19 +97,10 @@ class Game_Troop
   #---------------------------------------------------------------------------
   def setup_grid_positions(hex_grid)
     members.each do |member|
-      cds = Revoked::Grid.troop_battler_coordinates(member)
-      sum_x = 0
-      sum_y = 0
-      cds.each do |pair|
-        pos = Revoked::Grid.position(*pair)
-        sum_x += pos[:x]
-        sum_y += pos[:y]
-      end
+      coordinates = Revoked::Grid.troop_battler_coordinates(member)
+      Revoked::Grid.reset_troop_screen_xy(member, coordinates)
 
-      member.screen_x = sum_x / cds.size + Revoked::Grid::UnitXOffset
-      member.screen_y = sum_y / cds.size + Revoked::Grid::UnitYOffset
-      member.set_grid_location(cds)
-      containing_tiles = hex_grid.tiles_from_coordinates(cds)
+      containing_tiles = hex_grid.tiles_from_coordinates(coordinates)
       containing_tiles.each {|tile| tile.add_unit(member)}
     end
   end
@@ -249,7 +231,7 @@ class HexGrid
   # Cause the cursor to "bend" around the actor making an input.
   #---------------------------------------------------------------------------
   def setup_adaptive_cursor
-    @adapt_dir[:actor_row] = BattleManager.actor.grid_coordinates[0] rescue 0
+    @adapt_dir[:actor_row] = BattleManager.actor.grid_row
     update_adaptive_cursor
   end
   #---------------------------------------------------------------------------
@@ -259,7 +241,7 @@ class HexGrid
     case phase
     when :input
       @phase = :input
-      set_origin(*BattleManager.actor.grid_coordinates)
+      set_origin(*BattleManager.actor.grid_coordinates[0])
     when :selection
       @phase = :selection
       setup_adaptive_cursor
@@ -476,6 +458,27 @@ class HexGrid
   #----------------------------------------------------------------------------
   def remove_unit(unit)
     all_tiles.each {|tile| tile.remove_unit(unit) }
+  end
+
+  def relocate_unit_tiles(unit, new_tiles)
+    raise "wrong movement size" unless unit.grid_size == new_tiles.size
+    remove_unit(unit)
+    #msgbox_p(unit.grid_coordinates)
+    new_tiles.each {|tile| tile.add_unit(unit) }
+
+    tiles = new_tiles.collect {|tile| tile.coordinates_rc }
+    #msgbox_p(tiles)
+    unit.set_grid_location(tiles)
+  end
+
+  def relocate_unit_rc(unit, new_coordinates)
+    raise "wrong movement size" unless unit.grid_size == new_coordinates.size
+
+    orig = unit.grid_coordinates.dup
+    (orig - new_coordinates).each {|rc| get(*rc).remove_unit(unit) }
+    (new_coordinates - orig).each {|rc| get(*rc).add_unit(unit) }
+
+    unit.set_grid_location(new_coordinates)
   end
   #----------------------------------------------------------------------------
   # Get the array of units currently within the cursor + area range.

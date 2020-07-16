@@ -125,6 +125,20 @@ module Revoked
 
       return cds
     end
+
+    def self.reset_troop_screen_xy(battler, coordinates)
+      sum_x = 0
+      sum_y = 0
+      coordinates.each do |pair|
+        pos = Revoked::Grid.position(*pair)
+        sum_x += pos[:x]
+        sum_y += pos[:y]
+      end
+
+      battler.screen_x = sum_x / coordinates.size + Revoked::Grid::UnitXOffset
+      battler.screen_y = sum_y / coordinates.size + Revoked::Grid::UnitYOffset
+      battler.set_grid_location(coordinates)
+    end
     #--------------------------------------------------------------------------
     # Return the min and max x (column) value on a given row.
     #--------------------------------------------------------------------------
@@ -228,7 +242,7 @@ module Revoked
         when :arc
           selectable += grid.tiles_from_coordinates(calc_arc(origin,dir,range))
         when :not_self # Keep this at the end to omit the origin tile.
-          selectable -= [origin]
+          selectable -= grid.tiles_from_coordinates([origin])
         end
       end
       # Can add battler stats to influence the AoE.
@@ -257,6 +271,23 @@ module Revoked
 
       area.uniq!
       return area
+    end
+    #--------------------------------------------------------------------------
+    # Return whether the selected target is valid for the given item.
+    #--------------------------------------------------------------------------
+    def self.target_valid?(item, selected_targets, selected_region)
+      force_tags = item.grid_force_target_tags
+
+      force_tags.each do |tag|
+        case tag
+        when :ground
+          return false if selected_region.any? {|tile| tile.occupied? }
+        else # Any selectable target is valid.
+          return false if selected_targets.nil? || selected_targets.empty?
+        end
+      end
+
+      return true
     end
     #--------------------------------------------------------------------------
     # Compute the default/initial cursor position when selecting an ability.

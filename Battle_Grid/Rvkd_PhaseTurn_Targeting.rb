@@ -105,6 +105,15 @@ class RPG::UsableItem < RPG::BaseItem
     return []
   end
   #---------------------------------------------------------------------------
+  # Tags defining any mandatory target selection requirements.
+  #---------------------------------------------------------------------------
+  def grid_force_target_tags
+    if self.note =~ /<force[\s\_]*target:[\s]*(.+)>/i
+      return $1.split(%r{,\s*}).collect{|s| s.to_sym}
+    end
+    return [:any]
+  end
+  #---------------------------------------------------------------------------
   # Return a tag based on the RPG Maker database scope value.
   #---------------------------------------------------------------------------
   def grid_target_type
@@ -229,10 +238,10 @@ class Window_GridTarget < Window_Command
   #---------------------------------------------------------------------------
   # * Object Initialization
   #---------------------------------------------------------------------------
-  def initialize(battle_grid)
+  def initialize(hex_grid)
     super(0, 0)
-    @battle_grid = battle_grid
-    @current_action = nil
+    @hex_grid = hex_grid
+    @current_item = nil
     refresh
     self.openness = 0
     self.active = false
@@ -243,22 +252,24 @@ class Window_GridTarget < Window_Command
   def update
     super
     if self.active
-      @battle_grid.update
+      @hex_grid.update
     end
   end
   #---------------------------------------------------------------------------
   # Open up grid targeting for the player to select their item destination.
   #---------------------------------------------------------------------------
   def setup_range(battler, item)
+    @current_item = item
+
     origin = [battler.grid_row, battler.grid_col]
-    interact = Revoked::Grid.make_interact_tiles(@battle_grid, origin, item)
+    interact = Revoked::Grid.make_interact_tiles(@hex_grid, origin, item)
     available = interact[:available]
     potential = interact[:potential]
-    cursor_t = Revoked::Grid.auto_cursor(@battle_grid, origin, available, item)
-    area = Revoked::Grid.make_area_tiles(@battle_grid, cursor_t, item)
+    cursor_t = Revoked::Grid.auto_cursor(@hex_grid, origin, available, item)
+    area = Revoked::Grid.make_area_tiles(@hex_grid, cursor_t, item)
 
-    @battle_grid.set_area_item(item)
-    @battle_grid.setup_target_selection(cursor_t, available, potential, area)
+    @hex_grid.set_area_item(item)
+    @hex_grid.setup_target_selection(cursor_t, available, potential, area)
 
     dummy = Game_Action.new(battler)
     item.is_a?(RPG::Skill) ? dummy.set_skill(item.id) : dummy.set_item(item.id)
@@ -270,7 +281,8 @@ class Window_GridTarget < Window_Command
   # End grid targeting (confirm or cancel)
   #---------------------------------------------------------------------------
   def finish_target_selection(cancel)
-    @battle_grid.finish_target_selection
+    @hex_grid.finish_target_selection
+    @current_item = nil
     PhaseTurn.cancel_indicated_events if cancel
   end
   #---------------------------------------------------------------------------
@@ -285,8 +297,10 @@ class Window_GridTarget < Window_Command
   # Processing When OK Button Is Pressed
   #---------------------------------------------------------------------------
   def process_ok
-    targets = @battle_grid.get_selected_units
-    if (!targets.nil? && !targets.empty?)
+    targets = @hex_grid.get_selected_units
+    area = @hex_grid.copy_targeted_area
+    # Determine whether the ability can be used on the target.
+    if Revoked::Grid.target_valid?(@current_item, targets, area)
       Sound.play_grid_confirm
       Input.update
       deactivate
