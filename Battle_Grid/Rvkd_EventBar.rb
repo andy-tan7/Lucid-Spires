@@ -7,39 +7,6 @@
 #==============================================================================
 module PhaseTurn
 
-  Bar = {
-    :x => 0,
-    :y => 4,
-    :bar_init_x => -250,
-    :short_bar_offset_x => -152,
-    :unrevealed_bar_offset_x => -116,
-
-    :time_width => 36,
-    :time_font_size => 18,
-
-    :face_x => 36,
-    :face_y => -1,
-
-    :item_icon_x => 66,
-    :item_icon_y => 0,
-
-    :item_name_alpha => 255,
-    :item_name_alpha_init => 0,
-
-    :item_name_x => 92,
-    :item_name_y => 0,
-    :item_name_width => 180,
-    :item_name_font_size => 20,
-
-    :bar_width => 300,
-    :bar_height => 27,
-    :top_offset => 8,
-
-    :bar_tone => {
-      :regular => Tone.new,
-      :gold => Tone.new(168, 120, 16, 64),
-    }
-  }
   #---------------------------------------------------------------------------
   # * Initialize battle event display.
   #---------------------------------------------------------------------------
@@ -551,28 +518,6 @@ class Window_TurnBarName < Window_Base
 end # Window_TurnBarName
 
 #=============================================================================
-# ■ Spriteset_Battle
-#=============================================================================
-class Spriteset_Battle
-  #---------------------------------------------------------------------------
-  # Create the battle event display with the UI viewport.
-  #---------------------------------------------------------------------------
-  def create_event_display
-    @event_display = PhaseTurn.create_event_display(@viewport1)
-    return @event_display
-  end
-  #---------------------------------------------------------------------------
-  # * Free
-  #---------------------------------------------------------------------------
-  alias rvkd_phaseturn_bar_spb_dispose dispose
-  def dispose
-    rvkd_phaseturn_bar_spb_dispose
-    dispose_turn_display
-  end
-  def dispose_turn_display ; @event_display.dispose_events ; end
-end # Spriteset_Battle
-
-#=============================================================================
 # ■ Scene_Battle
 #=============================================================================
 class Scene_Battle
@@ -588,25 +533,6 @@ class Scene_Battle
     PhaseTurn.update_event_display
   end
 end # Scene_Battle
-
-#=============================================================================
-# ■ Game_Battler
-#=============================================================================
-class Game_Battler
-  def battle_event_bar_face
-    return "_" + name
-  end
-end # Game_Battler
-
-#=============================================================================
-# ■ Game_Enemy
-#=============================================================================
-class Game_Enemy
-  def battle_event_bar_face
-    return "_" + $1.to_s if enemy.note =~ /<event_face[\s_]*:\s*(\w+)>/i
-    return ""
-  end
-end # Game_Enemy
 
 #==============================================================================
 #

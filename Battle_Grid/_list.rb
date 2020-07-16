@@ -1,5 +1,12 @@
+Rvkd_GridConfig
+Rvkd_TimeSlot
 Rvkd_PhaseTurn
 Rvkd_PhaseTurn_Targeting
 Rvkd_EventBar
+RGSB_Spriteset
+RGSB_Troop
+RGSB_Item
+RGSB_Battler
+RGSB_Action
 Rvkd_GridModule
 Rvkd_HexGrid
