@@ -78,14 +78,16 @@ module PhaseTurn
   #---------------------------------------------------------------------------
   def self.indicate_player_selected_event(event)
     ins_at = event.time == @current_time ? 1 : nil
-    ins_at ||= get_insertion_index(event.time, @event_display.get_times_array)
+    ins_at ||= Revoked::Phase.get_insertion_index(event.time,
+      @event_display.get_times_array)
     @temp_display_action = add_display_unit_event(ins_at, event, :gold)
   end
 
   # Demo the player's next turn if they confirm the indicated action.
   def self.indicate_player_selected_next_turn(event)
     ins_at = event.time == @current_time ? 1 : nil
-    ins_at ||= get_insertion_index(event.time, @event_display.get_times_array)
+    ins_at ||= Revoked::Phase.get_insertion_index(event.time,
+      @event_display.get_times_array)
     @temp_display_next_turn = add_display_unit_event(ins_at, event, :gold)
   end
 
@@ -143,7 +145,7 @@ class Rvkd_EventDisplay
   # Create a visual display bar for a unit's turn or action event.
   #---------------------------------------------------------------------------
   def create_unit_event(event, index, tone)
-    index ||= PhaseTurn.get_insertion_index(event.time, get_times_array)
+    index ||= Revoked::Phase.get_insertion_index(event.time, get_times_array)
     element = Rvkd_EventDisplay_Element.new(event, @viewport, index, tone)
     add_display_element(element)
   end
@@ -269,12 +271,12 @@ class Rvkd_EventDisplay_Element
     @time = event.time
     @player_revealed = @event.revealed?
     # Initialize movement and position
-    @cur_x = PhaseTurn::Bar[:bar_init_x]
+    @cur_x = Revoked::Phase::Bar[:bar_init_x]
     @cur_y = calc_location_y(index)
     @goal_x = @cur_x
     @goal_y = @cur_y
     @shadow_goal_x = @cur_x + calc_offset_x
-    @text_goal_alpha = @player_revealed ? PhaseTurn::Bar[:item_name_alpha] : 0
+    @text_goal_alpha = @player_revealed ? Revoked::Phase::Bar[:item_name_a] : 0
     @moving = false
     @move_time = 0
     @revealing = false
@@ -290,8 +292,8 @@ class Rvkd_EventDisplay_Element
     face_name = @battler.battle_event_bar_face
     @battler_face = Sprite.new(viewport)
     @battler_face.bitmap = Cache.grid_turn("turn_face" + face_name)
-    @battler_face.x = @cur_x + PhaseTurn::Bar[:face_x]
-    @battler_face.y = @cur_y + PhaseTurn::Bar[:face_y]
+    @battler_face.x = @cur_x + Revoked::Phase::Bar[:face_x]
+    @battler_face.y = @cur_y + Revoked::Phase::Bar[:face_y]
     @battler_face.z = 24
     # Initialize the time slot display and action icon.
     @time_icon_bar = Window_TurnBarTimeIcon.new(@cur_x, @cur_y)
@@ -311,7 +313,7 @@ class Rvkd_EventDisplay_Element
     return if index == @index
     @index = index
     # Slides in from left to right when first created.
-    @goal_x = PhaseTurn::Bar[:x] unless @goal_x == PhaseTurn::Bar[:x]
+    @goal_x = Revoked::Phase::Bar[:x] unless @goal_x == Revoked::Phase::Bar[:x]
     @goal_y = calc_location_y(index)
     PhaseTurn.anim_track_element(self)
     @moving = true
@@ -329,7 +331,7 @@ class Rvkd_EventDisplay_Element
     @text_goal_alpha = 255
     name = @action.item.name
     # Draw a transparent name.
-    @text_bar.draw_event_name(name, PhaseTurn::Bar[:item_name_alpha_init])
+    @text_bar.draw_event_name(name, Revoked::Phase::Bar[:item_name_a_init])
     @revealing = true
     @reveal_time = time
   end
@@ -345,24 +347,24 @@ class Rvkd_EventDisplay_Element
   #---------------------------------------------------------------------------
   def set_tone(tone_symbol)
     return unless @shadow_bar
-    @shadow_bar.tone = PhaseTurn::Bar[:bar_tone][tone_symbol]
+    @shadow_bar.tone = Revoked::Phase::Bar[:bar_tone][tone_symbol]
   end
   #---------------------------------------------------------------------------
   # Calculate the bar shadow's distance off the left edge to simulate length
   #---------------------------------------------------------------------------
   def calc_offset_x
     if @event.type == :action
-      return @player_revealed ? 0 : PhaseTurn::Bar[:unrevealed_bar_offset_x]
+      return @player_revealed ? 0 : Revoked::Phase::Bar[:hidden_bar_offset_x]
     elsif @event.type == :turn || @event.type == :event
-      return PhaseTurn::Bar[:short_bar_offset_x]
+      return Revoked::Phase::Bar[:short_bar_offset_x]
     end
   end
   #---------------------------------------------------------------------------
   # Calculate element position in the list based on index.
   #---------------------------------------------------------------------------
   def calc_location_y(index)
-    loc = PhaseTurn::Bar[:y] + index * PhaseTurn::Bar[:bar_height]
-    loc += PhaseTurn::Bar[:top_offset] if index > 0
+    loc = Revoked::Phase::Bar[:y] + index * Revoked::Phase::Bar[:bar_height]
+    loc += Revoked::Phase::Bar[:top_offset] if index > 0
     return loc
   end
   #---------------------------------------------------------------------------
@@ -452,7 +454,7 @@ class Window_TurnBarTimeIcon < Window_Base
   # * Object Initialization
   #---------------------------------------------------------------------------
   def initialize(x, y)
-    super(x, y, PhaseTurn::Bar[:bar_width], PhaseTurn::Bar[:bar_height])
+    super(x,y,Revoked::Phase::Bar[:bar_width],Revoked::Phase::Bar[:bar_height])
     self.x = x
     self.y = y
     self.z = 40
@@ -462,25 +464,25 @@ class Window_TurnBarTimeIcon < Window_Base
   # Draw time slot on the left edge.
   #---------------------------------------------------------------------------
   def draw_event_time(text)
-    width = PhaseTurn::Bar[:time_width]
-    height = PhaseTurn::Bar[:bar_height]
-    contents.font.size = PhaseTurn::Bar[:time_font_size]
+    width = Revoked::Phase::Bar[:time_width]
+    height = Revoked::Phase::Bar[:bar_height]
+    contents.font.size = Revoked::Phase::Bar[:time_font_size]
     draw_text(Rect.new(0, 0, width, height), text, 1)
   end
   #---------------------------------------------------------------------------
   # Draw the event action icon on the right.
   #---------------------------------------------------------------------------
   def draw_event_icon(icon_index)
-    icon_x = PhaseTurn::Bar[:item_icon_x]
-    icon_y = PhaseTurn::Bar[:item_icon_y]
+    icon_x = Revoked::Phase::Bar[:item_icon_x]
+    icon_y = Revoked::Phase::Bar[:item_icon_y]
     draw_icon(icon_index, icon_x, icon_y)
   end
   #---------------------------------------------------------------------------
   # Setup the rects used to draw the time and event label.
   #---------------------------------------------------------------------------
   def setup_time_rect
-    width = PhaseTurn::Bar[:time_width]
-    height = PhaseTurn::Bar[:bar_height]
+    width = Revoked::Phase::Bar[:time_width]
+    height = Revoked::Phase::Bar[:bar_height]
     return
   end
 
@@ -495,7 +497,7 @@ class Window_TurnBarName < Window_Base
   # * Object Initialization
   #---------------------------------------------------------------------------
   def initialize(x, y)
-    super(x, y, PhaseTurn::Bar[:bar_width], PhaseTurn::Bar[:bar_height])
+    super(x,y,Revoked::Phase::Bar[:bar_width],Revoked::Phase::Bar[:bar_height])
     self.x = x
     self.y = y
     self.z = 32
@@ -504,12 +506,12 @@ class Window_TurnBarName < Window_Base
   #---------------------------------------------------------------------------
   # Draw the name of the ability on the right.
   #---------------------------------------------------------------------------
-  def draw_event_name(name, opacity = PhaseTurn::Bar[:item_name_alpha])
-    width = PhaseTurn::Bar[:item_name_width]
-    x = PhaseTurn::Bar[:item_name_x]
-    y = PhaseTurn::Bar[:item_name_y]
-    height = PhaseTurn::Bar[:bar_height]
-    contents.font.size = PhaseTurn::Bar[:item_name_font_size]
+  def draw_event_name(name, opacity = Revoked::Phase::Bar[:item_name_a])
+    width = Revoked::Phase::Bar[:item_name_width]
+    x = Revoked::Phase::Bar[:item_name_x]
+    y = Revoked::Phase::Bar[:item_name_y]
+    height = Revoked::Phase::Bar[:bar_height]
+    contents.font.size = Revoked::Phase::Bar[:item_name_font_size]
     draw_text(Rect.new(x, y, width, height), name, 0)
     self.contents_opacity = opacity
   end

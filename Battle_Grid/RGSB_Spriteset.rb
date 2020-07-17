@@ -25,7 +25,6 @@ class Spriteset_Battle
   end
   def dispose_turn_display ; @event_display.dispose_events ; end
 
-
   #============================================================================
   # Hex Grid
   #---------------------------------------------------------------------------

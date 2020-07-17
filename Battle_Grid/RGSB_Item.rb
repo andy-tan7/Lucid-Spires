@@ -22,7 +22,7 @@ class RPG::UsableItem < RPG::BaseItem
   #---------------------------------------------------------------------------
   def reset_time
     return $1.to_i if self.note =~ /<reset[\s_]*:\s*(\d+)>/i
-    return PhaseTurn::DEFAULT_RESET_TIME
+    return Revoked::Phase::DEFAULT_RESET_TIME
   end
   #---------------------------------------------------------------------------
   # A fixed preparation time means it cannot be reduced with speed stats.

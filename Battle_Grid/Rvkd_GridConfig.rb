@@ -32,47 +32,6 @@ module Revoked
   end
 end
 
-#=============================================================================
-# ■ PhaseTurn
-#=============================================================================
-module PhaseTurn
-
-  Bar = {
-    :x => 0,
-    :y => 4,
-    :bar_init_x => -250,
-    :short_bar_offset_x => -152,
-    :unrevealed_bar_offset_x => -116,
-
-    :time_width => 36,
-    :time_font_size => 18,
-
-    :face_x => 36,
-    :face_y => -1,
-
-    :item_icon_x => 66,
-    :item_icon_y => 0,
-
-    :item_name_alpha => 255,
-    :item_name_alpha_init => 0,
-
-    :item_name_x => 92,
-    :item_name_y => 0,
-    :item_name_width => 180,
-    :item_name_font_size => 20,
-
-    :bar_width => 300,
-    :bar_height => 27,
-    :top_offset => 8,
-
-    :bar_tone => {
-      :regular => Tone.new,
-      :gold => Tone.new(168, 120, 16, 64),
-    }
-  }
-
-end
-
 #==============================================================================
 # ■ Cache
 #==============================================================================

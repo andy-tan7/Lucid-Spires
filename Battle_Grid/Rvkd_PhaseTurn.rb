@@ -1,17 +1,12 @@
 #==============================================================================
 # Grid Shift Phase Turn Battle System - Turn Ordering
 #------------------------------------------------------------------------------
-#  This script handles the implementation of time slots, initiative and delay.
+#  This script handles the implementation of time slots, initiative/delay, and
+#  the handling for the event display bar.
 #==============================================================================
 # ■ PhaseTurn
 #==============================================================================
 module PhaseTurn
-  #---------------------------------------------------------------------------
-  # * Constants
-  #---------------------------------------------------------------------------
-  PHASE_DURATION = 100
-  INITIAL_TURN_SPAN = 20
-  DEFAULT_RESET_TIME = 20
   #---------------------------------------------------------------------------
   # * Public Instance Variables
   #---------------------------------------------------------------------------
@@ -33,65 +28,25 @@ module PhaseTurn
     @event_display = nil
   end
 
+  # Keep reference of a hex grid.
+  def self.set_grid(hex_grid) ; @hex_grid = hex_grid ; end
+
   # Initialize new battle phase
   def self.start_new_phase(members, reset_timeslots = true)
     if reset_timeslots
-      @schedule = calc_phase_start_order(members)
+      @schedule = Revoked::Phase.calc_phase_start_order(members)
       start_new_event_display
     end
   end
 
-  # Keep track of a new battle hex grid.
-  def self.set_grid(hex_grid) ; @hex_grid = hex_grid ; end
-  #---------------------------------------------------------------------------
-  # Calculate troop order. Dead units are not used in the calculation.
-  #---------------------------------------------------------------------------
-  def self.calc_phase_start_order(all_members)
-    pairs = recalculate_initiative(all_members)
-    # Sort by initial turn slot (ascending) and return an array of turn events.
-    timeslot_turns = []
-    pairs.sort_by {|_,spds| spds[1] }.each do |pair|
-      timeslot_turns.push(Rvkd_TimeSlotTurn.new(pair[1][1], pair[0]))
-    end
-    return timeslot_turns
-  end
-  #---------------------------------------------------------------------------
-  # Calculate the delay until every member's first turn.
-  #---------------------------------------------------------------------------
-  def self.recalculate_initiative(all_members)
-    # populate an array of unit-speed pairs for the entire actionable troop.
-    # speeds variable will be an array [spd stat, initial calc]
-    all_members = all_members.select {|member| member.alive? }
-    pairs = {}
-    all_members.each {|unit| pairs[unit] = [unit.agi, nil] }
-    slowest_unit = pairs.collect{|p| p[1] }.inject{|x,y| [x,y].min }
-
-    # Calculate initial speed factors, scaled to the initial turn span.
-    d = [slowest_unit[0], INITIAL_TURN_SPAN].min
-    pairs.each_value {|spds| spds[1] = INITIAL_TURN_SPAN / (spds[0].to_f / d) }
-
-    return pairs
-  end
-  #---------------------------------------------------------------------------
-  # Create a set of actions for demoing player input results.
-  # These actions are used to directly add to the schedule if confirmed.
-  #---------------------------------------------------------------------------
-  def self.create_temp_events(actor, action)
-    exec_time = current_time + action.prep_time
-    next_turn_time = exec_time + action.reset_time
-
-    temp_action = Rvkd_TimeSlotAction.new(exec_time, actor, action)
-    temp_next_turn = Rvkd_TimeSlotTurn.new(next_turn_time, actor)
-
-    return [temp_action, temp_next_turn]
-  end
   #---------------------------------------------------------------------------
   # * Add an event to both the turn schedule and the event display list.
   #---------------------------------------------------------------------------
   def self.insert_timeslot_event(event)
     insert_schedule_only(event)
     ins_at = 1 if event.time == @current_time
-    ins_at ||= get_insertion_index(event.time, @event_display.get_times_array)
+    ins_at ||= Revoked::Phase.get_insertion_index(event.time,
+      @event_display.get_times_array)
 
     add_display_unit_event(ins_at, event)
   end
@@ -99,50 +54,12 @@ module PhaseTurn
   # Add an event only to the turn schedule.
   def self.insert_schedule_only(event)
     ins_at = 0 if event.time == @current_time
-    ins_at ||= get_insertion_index(event.time, @schedule.collect {|e| e.time})
+    ins_at ||= Revoked::Phase.get_insertion_index(event.time,
+      @schedule.collect {|e| e.time})
 
     @schedule.insert(ins_at, event)
   end
-  #---------------------------------------------------------------------------
-  # Binary search for an insertion point of a time based on an array of times.
-  #---------------------------------------------------------------------------
-  def self.get_insertion_index(ins_time, times)
-    # O(logn) solution
-    lower = 0
-    upper = times.length - 1
 
-    return times.length if times.empty? || times.last < ins_time
-    return 0 if times.first > ins_time
-
-    while (lower <= upper)
-      mid = (lower + upper) / 2
-      if (times[mid] == ins_time)
-        mid += 1 while (times[mid] == ins_time)
-        return mid
-      elsif (times[mid] < ins_time)
-        return mid + 1 if (mid < times.length) && times[mid + 1] > ins_time
-        lower = mid + 1
-      elsif (times[mid] > ins_time)
-        return mid if mid > 0 && times[mid - 1] < ins_time
-        upper = mid - 1
-      end
-    end
-    raise "did not find insertion index"
-  end
-  #---------------------------------------------------------------------------
-  # * Remove a unit from the current grid, then remove its scheduled events.
-  #---------------------------------------------------------------------------
-  def self.remove_grid_unit(unit)
-    @hex_grid.remove_unit(unit)
-    remove_unit_events(unit)
-  end
-
-  # Remove all events where the unit is the subject.
-  def self.remove_unit_events(unit)
-    rem_events = @schedule.select {|event| event.subject == unit}
-    @schedule -= rem_events
-    remove_multiple_events(rem_events)
-  end
   #---------------------------------------------------------------------------
   # Shift the schedule, retrieve the next upcoming event and update time.
   #---------------------------------------------------------------------------
@@ -159,6 +76,23 @@ module PhaseTurn
   def self.units_in_area(tiles)
     return Revoked::Grid.units_in_area(@hex_grid, tiles)
   end
+
+  #===========================================================================
+  # Grid manipulation
+  #---------------------------------------------------------------------------
+  # * Remove a unit from the current grid, then remove its scheduled events.
+  #---------------------------------------------------------------------------
+  def self.remove_grid_unit(unit)
+    @hex_grid.remove_unit(unit)
+    remove_unit_events(unit)
+  end
+
+  # Remove all events where the unit is the subject.
+  def self.remove_unit_events(unit)
+    rem_events = @schedule.select {|event| event.subject == unit}
+    @schedule -= rem_events
+    remove_multiple_events(rem_events)
+  end
   #---------------------------------------------------------------------------
   # Relocate a unit.
   #---------------------------------------------------------------------------
@@ -169,8 +103,7 @@ module PhaseTurn
   end
 
   def self.move_command(actor)
-    msgbox_p("123")
-    #msgbox_p(actor.current_action.targeted_grid)
+    msgbox_p(123)
     move_unit(actor, actor.current_action.targeted_grid)
   end
 

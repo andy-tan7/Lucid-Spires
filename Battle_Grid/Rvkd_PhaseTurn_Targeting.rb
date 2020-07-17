@@ -148,7 +148,7 @@ class Window_GridTarget < Window_Command
 
     dummy = Game_Action.new(battler)
     item.is_a?(RPG::Skill) ? dummy.set_skill(item.id) : dummy.set_item(item.id)
-    temp = PhaseTurn.create_temp_events(battler, dummy)
+    temp = Revoked::Phase.create_temp_events(battler, dummy)
     PhaseTurn.indicate_player_selected_event(temp[0])
     PhaseTurn.indicate_player_selected_next_turn(temp[1])
   end
