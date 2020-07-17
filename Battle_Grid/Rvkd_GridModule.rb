@@ -223,7 +223,7 @@ module Revoked
 
       force_tags.each do |tag|
         case tag
-        when :ground
+        when :vacancy
           return false if selected_region.any? {|tile| tile.occupied? }
         else # Any selectable target is valid.
           return false if selected_targets.nil? || selected_targets.empty?

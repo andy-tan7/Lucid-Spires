@@ -43,6 +43,8 @@ class Game_Action
 
     if item.target_homing
       targets = targets_initial
+    elsif item.target_vacancy
+      targets = [subject]
     else
       # Check for original target(s) in range
       targets = PhaseTurn.units_in_area(@targeted_grid)

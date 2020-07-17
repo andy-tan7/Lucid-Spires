@@ -60,6 +60,15 @@ class RPG::UsableItem < RPG::BaseItem
     return @retargetable
   end
   #---------------------------------------------------------------------------
+  # Whether the skill can only target an empty ground position
+  #---------------------------------------------------------------------------
+  def target_vacancy
+    return @target_vacancy unless @target_vacancy.nil?
+
+    @target_vacancy = grid_force_target_tags.include?(:vacancy)
+    return @target_vacancy
+  end
+  #---------------------------------------------------------------------------
   # The hexagonal distance the item can reach.
   #---------------------------------------------------------------------------
   def ability_range
