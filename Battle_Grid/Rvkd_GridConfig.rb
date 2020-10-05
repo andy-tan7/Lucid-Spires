@@ -19,6 +19,10 @@ module Revoked
     TileXOffset = -3
     TileYOffset = -10
 
+    TileYBoxStart = 20
+    TileYBoxEnd = 52
+    TileBoxPadLeft = 4
+
     UnitXOffset = 32
     UnitYOffset = 48
 

@@ -174,8 +174,9 @@ class Window_GridTarget < Window_Command
   def process_ok
     targets = @hex_grid.get_selected_units
     area = @hex_grid.copy_targeted_area
+    intersect = @hex_grid.intersect?
     # Determine whether the ability can be used on the target.
-    if Revoked::Grid.target_valid?(@current_item, targets, area)
+    if Revoked::Grid.target_valid?(@current_item, targets, area) && intersect
       Sound.play_grid_confirm
       Input.update
       deactivate

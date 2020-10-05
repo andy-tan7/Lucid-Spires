@@ -9,7 +9,7 @@
 # Copy and paste into a new slot in materials, below all other scripts
 #----------------------------------------------------------------------------
 # To Customize:
-# Add keyword icon index pairs to the ICON hash (below this documentation).  
+# Add keyword icon index pairs to the ICON hash (below this documentation).
 # Each of the keywords can be used in an event comment to make the mouse
 # cursor change into that icon when hovering over the event.
 #----------------------------------------------------------------------------
@@ -59,7 +59,7 @@
 # Game_Map.setup_starting_map_event
 # Game_Map.setup_autorun_common_event
 #
-# If you have other scripts that ALIAS these methods, this mouse script should 
+# If you have other scripts that ALIAS these methods, this mouse script should
 # be placed above them.
 #----------------------------------------------------------------------------
 # Terms:
@@ -105,7 +105,7 @@
 # Add/remove/change icon names here.  The icon name is what will be used in the
 # event <mouse ...> command to show a different mouse icon when hovering over
 # the event.  These MUST be in lower case here!
-ICON = {'arrow' => 386, 'talk' => 4, 'look' => 3, 'fight' => 116,
+ICON = {'arrow' => 397, 'talk' => 4, 'look' => 3, 'fight' => 116,
         'touch' => 491, 'exit' => 121}
 DEFAULT_ICON = 'arrow'
 
@@ -153,7 +153,7 @@ class Sprite_Mouse < Sprite
       cursor = DEFAULT_ICON
       text = nil
     end
-      
+
     if @cursor != cursor || @text != text
       @cursor = cursor
       @text = text
@@ -161,7 +161,7 @@ class Sprite_Mouse < Sprite
       rect = Rect.new(item_cursor % 16 * 24, item_cursor / 16 * 24, 24, 24)
       if @text.nil?
         self.bitmap = Bitmap.new(24, 32)
-        self.bitmap.blt(0, 0, Cache.system('Iconset'), rect) 
+        self.bitmap.blt(0, 0, Cache.system('Iconset'), rect)
       else
         w = @dummy.text_size(@text).width
         h = @dummy.font.size
@@ -172,7 +172,7 @@ class Sprite_Mouse < Sprite
           bitmap.draw_text(0, 0, w, h, @text)
           bitmap.blt(w, 0, Cache.system('Iconset'), rect)
         else
-          bitmap.blt(0, 0, Cache.system('Iconset'), rect) 
+          bitmap.blt(0, 0, Cache.system('Iconset'), rect)
           bitmap.draw_text(26, 0, w, h, @text)
         end
         self.bitmap = bitmap
@@ -198,7 +198,7 @@ class Sprite_Mouse < Sprite
       end
     end
     # default bitmap if not over an event
-    set_bitmap 
+    set_bitmap
   end
   #--------------------------------------------------------------------------
   # * Enable Mouse
@@ -306,7 +306,7 @@ module Mouse
   def self.pos
     gx, gy = global_pos
     x, y = screen_to_client(gx, gy)
-    
+
     # Test boundaries
     begin
       if (x >= 0 && y >= 0 && x <= Graphics.width && y <= Graphics.height)
@@ -324,27 +324,27 @@ module Mouse
   def self.update
     old_pos = @pos
     @pos = self.pos
-    
+
     # Has mouse been moved?
     if old_pos != @pos
       Input.method = :mouse
     end
-    
+
     # Which mouse to show - custom, or system?
     if $mouse.enabled? == @sys_cursor_visible
       @sys_cursor_visible = !@sys_cursor_visible
       ShowCursor.call(@sys_cursor_visible ? 1 : 0)
     end
-    
+
     return if !$mouse.enabled?
-    
+
     # Leaving / Entering Range?
     if old_pos != [-20, -20] && @pos == [-20, -20] # leaving range
       ShowCursor.call(1)
     elsif old_pos == [-20, -20] && @pos != [-20, -20] # entering range
       ShowCursor.call(0)
     end
-    
+
     # Update Triggers
     for i in @triggers
       n = GAKS.call(i[1])
@@ -370,7 +370,7 @@ module Mouse
   #   id : 0:Left, 1:Right, 2:Center
   #--------------------------------------------------------------------------
   def self.repeat?(id = 0)
-    return @triggers[id][0] > 0 && @triggers[id][0] % 5 == 1 
+    return @triggers[id][0] > 0 && @triggers[id][0] % 5 == 1
   end
   #--------------------------------------------------------------------------
   # * Hwnd
@@ -380,7 +380,7 @@ module Mouse
       title = "\0" * 256
       Readini.call('Game', 'Title', '', title, 255, '.\\Game.ini')
       title.delete!("\0")
-      @hwnd = Findwindow.call('RGSS Player', title) 
+      @hwnd = Findwindow.call('RGSS Player', title)
       ShowCursor.call(0)
     end
     return @hwnd
@@ -743,13 +743,13 @@ class Game_CharacterBase
     map[@tx, @ty] = 1
     old_positions = [[@tx, @ty]]
     new_positions = []
-    
+
     # if tile is impassable, but CAN move to adjacent tiles, use the adjacent tiles instead
     if (!passable?(@tx, @ty, 2) && !passable?(@tx, @ty, 4) &&
       !passable?(@tx, @ty, 6) && !passable?(@tx, @ty, 8)) ||
       $game_map.events_xy_nt(@tx, @ty).any? { |evt| evt.normal_priority? && evt != self }
       old_positions = []
-      
+
       # Can we move from the destination tile in any direction?
       if map_passable?(@tx, @ty, 2)
         map[@tx, @ty+1] = 1
@@ -767,14 +767,14 @@ class Game_CharacterBase
         map[@tx+1, @ty] = 1
         old_positions.push([@tx+1, @ty])
       end
-      
+
       # If not, can we at least move up to the destination tile?
       if old_positions.size == 0
         if map_passable?(@tx-1,@ty,6)
           map[@tx-1,@ty] = 1
           old_positions.push([@tx-1,@ty])
         end
-        if map_passable?(@tx+1,@ty,4) 
+        if map_passable?(@tx+1,@ty,4)
           map[@tx+1,@ty] = 1
           old_positions.push([@tx+1,@ty])
         end
@@ -788,7 +788,7 @@ class Game_CharacterBase
         end
       end
     end
-    
+
     # If there are any counters, can we move to the tile on the other side?
     if map_passable?(@tx-2,@ty,6) && $game_map.counter?(@tx-1,@ty)
       map[@tx-2,@ty] = 1
@@ -806,8 +806,8 @@ class Game_CharacterBase
       map[@tx,@ty+2] = 1
       old_positions.push([@tx,@ty+2])
     end
-    
-    
+
+
     depth = 2
     depth.upto(100) { |step|
       break if old_positions[0].nil?
@@ -844,7 +844,7 @@ class Game_CharacterBase
     }
     return [false, nil, nil]
   end
-end  
+end
 
 class Game_Character < Game_CharacterBase
   #--------------------------------------------------------------------------
@@ -897,7 +897,7 @@ class Game_Player < Game_Character
     else
       # Move by mouse input
       if !$game_message.busy? && !$game_message.visible && !@move_route_forcing &&
-        !@vehicle_getting_on && !@vehicle_getting_off && 
+        !@vehicle_getting_on && !@vehicle_getting_off &&
         Mouse.trigger?(0) && !Mouse.grid.nil? && !$mouse.ignored?
         mx, my = *Mouse.grid
         # turn in direction
@@ -915,7 +915,7 @@ class Game_Player < Game_Character
           @started_events = []
           clear_path
         else
-          find_path(@event.x + @event.mouse_position[0], 
+          find_path(@event.x + @event.mouse_position[0],
             @event.y + @event.mouse_position[1])
         end
       end
@@ -938,7 +938,7 @@ class Game_Player < Game_Character
       # Face event and trigger it (only if not triggered by start_map_event)
       turn_toward_character(@event) if !@event.pos?(@x, @y)
       if !@started_events.include?(@event.id) && !@map.nil? && !in_airship?
-        @event.start 
+        @event.start
         @started_events = []
       end
       clear_path
@@ -1012,17 +1012,17 @@ class Window_Selectable < Window_Base
     # Add a delay to prevent too-fast scrolling
     @delay = @delay ? @delay + 1 : 0
     return if @delay % 3 > 0
-    
+
     mx, my = *Mouse.position
     vx = self.viewport ? self.x - self.viewport.ox + self.viewport.rect.x : self.x
     vy = self.viewport ? self.y - self.viewport.oy + self.viewport.rect.y : self.y
     if mx.between?(vx, vx + self.width) &&
       my.between?(vy, vy + self.height)
-      mx -= vx 
+      mx -= vx
       mx -= padding
-      my -= vy 
+      my -= vy
       my -= padding
-      my += oy 
+      my += oy
       for i in 0 ... item_max
         rect = item_rect(i)
         if mx.between?(rect.x, rect.x + rect.width) &&
@@ -1030,14 +1030,14 @@ class Window_Selectable < Window_Base
           last_index = @index
           select(i)
           if @index != last_index
-            Sound.play_cursor 
+            Sound.play_cursor
           end
           break
         end
       end
     end
   end
-end  
+end
 
 class Window_NameInput < Window_Selectable
   #--------------------------------------------------------------------------
@@ -1048,15 +1048,15 @@ class Window_NameInput < Window_Selectable
     # Add a delay to prevent too-fast scrolling
     @delay = @delay ? @delay + 1 : 0
     return if @delay % 3 > 0
-    
+
     mx, my = *Mouse.position
     vx = (self.viewport ? self.x - self.viewport.ox + self.viewport.rect.x : self.x) + padding
     vy = (self.viewport ? self.y - self.viewport.oy + self.viewport.rect.y : self.y) + padding
     if mx.between?(vx, vx + self.width - padding * 2) &&
       my.between?(vy, vy + self.height - padding * 2)
-      mx -= vx 
-      my -= vy 
-      x = (mx > 5*32+16 ? mx-16 : mx) / 32 
+      mx -= vx
+      my -= vy
+      x = (mx > 5*32+16 ? mx-16 : mx) / 32
       y = my / line_height
       last_index = @index
       @index = y * 10 + x
@@ -1082,7 +1082,7 @@ class Scene_File < Scene_MenuBase
     # Add a delay to prevent too-fast scrolling
     @delay = @delay ? @delay + 1 : 0
     return if @delay % 3 > 0
-    
+
     mx, my = *Mouse.position
     vx = @savefile_viewport.ox + mx
     vy = @savefile_viewport.oy + my

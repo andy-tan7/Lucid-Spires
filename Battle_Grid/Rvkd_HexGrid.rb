@@ -66,6 +66,7 @@ class HexGrid
   def update
     if cursor_movable?
       process_cursor_move
+      process_mouse_handling if Input.method == :mouse
     end
   end
 
@@ -113,12 +114,49 @@ class HexGrid
     end
 
     unless @cursor.eql?(last)
+      @intersect = true
       Sound.play_grid_move
       cursor_deselect(get(*last))
       recalculate_area
       cursor_select(get(*@cursor))
       update_adaptive_cursor
     end
+  end
+
+  def process_mouse_handling
+    return unless $mouse.enabled? && cursor_movable?
+    # Add a delay to prevent too-fast scrolling
+    @mouse_delay = @mouse_delay ? @mouse_delay + 1 : 0
+    return if @mouse_delay % 3 > 0
+
+    mx, my = *Mouse.position
+    return if [mx, my] == @last_mouse_pos
+    last = @cursor.dup
+    @intersect = false
+
+    @sel_movable.each do |tile|
+      if tile.mouse_intersect(mx, my)
+        @intersect = true
+        set_cursor_tile(tile)
+        unless @cursor.eql?(last)
+          Sound.play_grid_move
+          cursor_deselect(get(*last))
+          recalculate_area
+          cursor_select(get(*@cursor))
+          update_adaptive_cursor
+        end
+        break
+      end
+    end
+    cursor_deselect(get(*@cursor)) unless @intersect
+    @last_mouse_pos = Mouse.position
+  end
+
+  #---------------------------------------------------------------------------
+  # Determine whether a tile is being currently hovered.
+  #---------------------------------------------------------------------------
+  def intersect?
+    @intersect
   end
 
   #---------------------------------------------------------------------------
@@ -495,6 +533,46 @@ class HexTile
   # Return whether the tile has one or more units on it.
   #---------------------------------------------------------------------------
   def occupied? ; return !@unit_contents.nil? && !@unit_contents.empty? ; end
+
+  #---------------------------------------------------------------------------
+  # Return whether the given mouse coordinates intersect with this tile.
+  #---------------------------------------------------------------------------
+  def mouse_intersect(mouse_x, mouse_y)
+    x_box = @floor_sprite.x + Revoked::Grid::TileBoxPadLeft
+    box_start = Revoked::Grid::TileYBoxStart
+    box_end = Revoked::Grid::TileYBoxEnd
+
+    x_range = [x_box, x_box + Revoked::Grid::TileWidth]
+    y_range = [@floor_sprite.y + box_start, @floor_sprite.y + box_end]
+
+    box = [x_range, y_range]
+
+    return false if mouse_x < box[0][0] # Too far left
+    return false if mouse_x > box[0][1] # Too far right
+
+    in_x = mouse_x.between?(box[0][0], box[0][1])
+    in_y = mouse_y.between?(box[1][0], box[1][1])
+    return true if in_x && in_y # Cursor in center box
+
+    less_y = mouse_y < box[1][0]
+    in_less_y = (less_y && (box[1][0] - mouse_y) < 15)
+    return false if less_y && !in_less_y # Too far up
+
+    greater_y = mouse_y > box[1][1]
+    in_greater_y = (greater_y && (box[1][1] - mouse_y) > -15)
+    return false if greater_y && !in_greater_y # Too far down
+
+    right_side = mouse_x > ((box[0][0] + box[0][1]) / 2)
+    trig_x = right_side ? (mouse_x - box[0][1]).abs : (mouse_x - box[0][0]).abs
+    trig_y = (trig_x * 2) / 3 # tan(17/29) = 0.664 ~= 2/3
+
+    if in_less_y
+      return true if mouse_y > (box[1][0] - trig_y) # Cursor in top triangle
+    elsif in_greater_y
+      return true if mouse_y < (box[1][1] + trig_y) # Cursor in bottom triangle
+    end
+    return false
+  end
 end # HexTile
 
 #=============================================================================
