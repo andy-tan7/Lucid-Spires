@@ -137,8 +137,9 @@ class HexGrid
     @sel_movable.each do |tile|
       if tile.mouse_intersect(mx, my)
         @intersect = true
+        deselect = @mouse_deselected
         set_cursor_tile(tile)
-        unless @cursor.eql?(last)
+        if !@cursor.eql?(last) || deselect
           Sound.play_grid_move
           cursor_deselect(get(*last))
           recalculate_area
@@ -155,9 +156,7 @@ class HexGrid
   #---------------------------------------------------------------------------
   # Determine whether a tile is being currently hovered.
   #---------------------------------------------------------------------------
-  def intersect?
-    @intersect
-  end
+  def intersect? ; @intersect ; end
 
   #---------------------------------------------------------------------------
   # Move up-left by default if no direction is specified.
@@ -305,10 +304,14 @@ class HexGrid
   #---------------------------------------------------------------------------
   # * Sprite changes
   #---------------------------------------------------------------------------
-  def cursor_select(tile) ; tile.select_tile end
+  def cursor_select(tile)
+    tile.select_tile
+    @mouse_deselected = false
+  end
   def cursor_deselect(tile)
     tile.deselect_tile
     tile.unlight_area
+    @mouse_deselected = true
   end
   #---------------------------------------------------------------------------
   # Highlighting. Handles both array arguments 't' and a single HexTile 't'.
