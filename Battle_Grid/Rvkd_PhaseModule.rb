@@ -52,7 +52,7 @@ module Revoked
     # Calculate troop order. Dead units are not used in the calculation.
     #---------------------------------------------------------------------------
     def self.calc_phase_start_order(all_members)
-      pairs = recalculate_initiative(all_members)
+      pairs = recalculate_initiative_factors(all_members)
       # Sort by initial turn slot (ascending) and return an array of turn events.
       timeslot_turns = []
       pairs.sort_by {|_,spds| spds[1] }.each do |pair|
@@ -75,6 +75,25 @@ module Revoked
       # Calculate initial speed factors, scaled to the initial turn span.
       d = [slowest_unit[0], INITIAL_TURN_SPAN].min
       pairs.each_value {|spds| spds[1] = INITIAL_TURN_SPAN / (spds[0].to_f / d) }
+
+      return pairs
+    end
+
+    def self.recalculate_initiative_factors(all_members)
+      # Order all battlers by agility.
+      all_members = all_members.select {|member| member.alive? }
+
+      agilities = all_members.collect {|unit| unit.agi }
+      low = agilities.min
+      diff = agilities.max - low
+
+      # Calculate the relative speeds and return unit-
+      ratios = all_members.collect {|u| [u, 1 - (u.agi - low).to_f / diff] }
+      pairs = {} # Hash key: unit; value: initiative factors
+      ratios.each do |r|
+        spd_factor = (1 + (9 * r[1])).to_i
+        pairs[r[0]] = [r[0].agi, (spd_factor..(2 * spd_factor)).to_a.sample]
+      end
 
       return pairs
     end
