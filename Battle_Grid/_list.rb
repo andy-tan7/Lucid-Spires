@@ -11,3 +11,4 @@ RGSB_Battler
 RGSB_Action
 Rvkd_GridModule
 Rvkd_HexGrid
+Rvkd_UI_Battle
