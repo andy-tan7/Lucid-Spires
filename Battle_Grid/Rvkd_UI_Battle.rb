@@ -14,7 +14,7 @@ module Revoked
   module BattleUI
 
     Description = {
-      :attack => "Strike with basic weapon attack.",
+      :attack => "Strike with a basic weapon attack.",
       :guard  => "Enter a defensive pose.",
       :item   => "Use a consumable item."
     }
@@ -28,6 +28,11 @@ module Revoked
     FONT_NAME = "EB Garamond 08 Standard Digit"
     FONT_WHITE = Color.new(255,255,255,255)
     SPLASH_OPACITY = 20
+
+    BUTTON_WIDTH = 58
+    COMMAND_PADDING = 4
+    COMMAND_SPACING = 4
+    COMMAND_Y = 474
 
     SPLASH_WIDTH = 360
 
@@ -54,6 +59,8 @@ class Scene_Battle
   # Override
   def create_actor_command_window
     @actor_command_window = Window_ActorCommand.new
+    @actor_command_window.opacity = 0
+    @actor_command_window.arrows_visible = false
     @actor_command_window.viewport = @info_viewport
     @actor_command_window.set_handler(:attack, method(:command_attack))
     @actor_command_window.set_handler(:skill,  method(:command_skill))
@@ -75,12 +82,25 @@ class Scene_Battle
   def create_all_windows
     rvkd_battleui_scb_create_all_windows
     create_battle_ui
+    @item_window.arrows_visible = false
   end
 
   alias rvkd_battleui_scb_update_basic update_basic
   def update_basic
     rvkd_battleui_scb_update_basic
     @battle_ui.update if @battle_ui.needs_update?
+  end
+
+  alias rvkd_battleui_scb_start_actor_cmd_select start_actor_command_selection
+  def start_actor_command_selection
+    rvkd_battleui_scb_start_actor_cmd_select
+    @battle_ui.show
+  end
+
+  alias rvkd_battleui_scb_start_next_action start_next_action
+  def start_next_action(event)
+    rvkd_battleui_scb_start_next_action(event)
+    @battle_ui.hide
   end
 
 end
@@ -104,16 +124,21 @@ end
 #==============================================================================
 class Window_ActorCommand < Window_Command
 
-  def window_width ; 368 end
+  # alias rvkd_battleui_actorcommand_initialize initialize
+  # def initialize
+  #   rvkd_battleui_actorcommand_initialize
+  #   self.arrows_visible = false
+  # end
+
   def row_max ; 1 end
-  def col_max ; 6 end
-  def line_height ; 59 end
-  def item_width ; 59 end
-  def spacing ; 4 end
-  def standard_padding ; 4 end
+  def col_max ; 10 end
+  def line_height ; Revoked::BattleUI::BUTTON_WIDTH end
+  def item_width ; Revoked::BattleUI::BUTTON_WIDTH end
+  def spacing ; Revoked::BattleUI::COMMAND_SPACING end
+  def standard_padding ; Revoked::BattleUI::COMMAND_PADDING end
 
   def window_width
-    return 2 * standard_padding + col_max * (item_width + spacing) - spacing
+    return 2 * standard_padding + @list.size * (item_width + spacing) - spacing
   end
 
   def window_height
@@ -133,6 +158,35 @@ class Window_ActorCommand < Window_Command
     @splash_window = splash_window
   end
 
+  alias rvkd_battleui_actorcommand_clear_command_list clear_command_list
+  def clear_command_list
+    rvkd_battleui_actorcommand_clear_command_list
+
+    @command_buttons ||= []
+    @command_buttons.each {|button| button.dispose}
+    @command_buttons.clear
+  end
+
+  alias rvkd_battleui_actorcommand_make_command_list make_command_list
+  def make_command_list
+    return unless @actor
+    rvkd_battleui_actorcommand_make_command_list
+    reposition_command_buttons
+  end
+
+  def reposition_command_buttons
+    return if @list.empty?
+
+    self.width = window_width
+    self.x = Graphics.width - self.width
+
+    return unless @command_buttons && !@command_buttons.empty?
+    num_buttons = @command_buttons.size
+    @command_buttons.each_with_index do |button, i|
+      button.set_position(i, num_buttons)
+    end
+  end
+
   # Override
   def add_command_desc(n, s, d, enabled = true, ext = nil)
     @list.push({:name=>n, :symbol=>s, :desc=>d, :enabled=>enabled, :ext=>ext})
@@ -140,8 +194,10 @@ class Window_ActorCommand < Window_Command
 
   # Override adding commands.
   def add_attack_command
-    desc = Revoked::BattleUI::Description[:attack]
-    add_command_desc(Vocab::attack, :attack, desc, @actor.attack_usable?)
+    symbol = :attack
+    desc = Revoked::BattleUI::Description[symbol]
+    add_command_desc(Vocab::attack, symbol, desc, @actor.attack_usable?)
+    @command_buttons.push(BattleUI_Button.new(viewport, symbol))
   end
 
   # Override
@@ -150,18 +206,23 @@ class Window_ActorCommand < Window_Command
       name = $data_system.skill_types[stype_id]
       desc = Revoked::BattleUI::SType_Desc[stype_id]
       add_command_desc(name, :skill, desc, true, stype_id)
+      @command_buttons.push(BattleUI_Button.new(viewport, name))
     end
   end
 
   # Override
   def add_guard_command
-    desc = Revoked::BattleUI::Description[:guard]
-    add_command_desc(Vocab::guard, :guard, desc, @actor.guard_usable?)
+    symbol = :guard
+    desc = Revoked::BattleUI::Description[symbol]
+    add_command_desc(Vocab::guard, symbol, desc, @actor.guard_usable?)
+    @command_buttons.push(BattleUI_Button.new(viewport, symbol))
   end
 
   def add_item_command
-    desc = Revoked::BattleUI::Description[:item]
-    add_command_desc(Vocab::item, :item, desc)
+    symbol = :item
+    desc = Revoked::BattleUI::Description[symbol]
+    add_command_desc(Vocab::item, symbol, desc)
+    @command_buttons.push(BattleUI_Button.new(viewport, symbol))
   end
 
   # Override
@@ -174,6 +235,9 @@ class Window_ActorCommand < Window_Command
       p(current_data[:desc])
       @help_window.set_desc(current_data[:desc].dup)
       @splash_window.set_splash(current_data[:name])
+      @command_buttons.each_with_index do |button, i|
+        @index == i ? button.select_button : button.unselect_button
+      end
     end
   end
 
@@ -189,6 +253,22 @@ class Window_ActorCommand < Window_Command
     rvkd_battleui_actorcommand_hide
     @help_window.hide
     @splash_window.hide
+    @command_buttons.each {|button| button.dispose } if @command_buttons
+  end
+
+  # Override - don't draw the text for the command name.
+  def draw_item(index)
+    change_color(normal_color, command_enabled?(index))
+  end
+
+  # Override - don't use a hightlighting cursor
+  # def update_cursor
+  #   msgbox_p(cursor_rect)
+  #   cursor_rect.empty
+  # end
+
+  def pending_color
+    return Color.new(255,255,255,255)
   end
 
   # Override
@@ -197,6 +277,11 @@ class Window_ActorCommand < Window_Command
 
 end
 
+#==============================================================================
+# ■ BattleUI_Bar
+#-----------------------------------------------------------------------------
+# Define the GUI bottom bar with actor command buttons and descriptions.
+#==============================================================================
 class BattleUI_Bar
 
   attr_reader :command_help_window
@@ -206,16 +291,37 @@ class BattleUI_Bar
 
     help_width = Graphics.width - actor_command_window.width
     @command_help_window = Window_BattleUI_Help.new(help_width)
-    @command_splash = Window_BattleUI_Splash.new(help_width)
+    @command_splash_window = Window_BattleUI_Splash.new(help_width)
 
     @actor_command_window.set_command_help(@command_help_window)
-    @actor_command_window.set_splash_window(@command_splash)
+    @actor_command_window.set_splash_window(@command_splash_window)
 
     @background_bar = Sprite.new(viewport)
     @background_bar.bitmap = Cache.battle_ui("command_background")
     @background_bar.x = -10
     @background_bar.y = Graphics.height - 96
+  end
 
+  def show
+    @actor_command_window.show
+    @command_help_window.show
+    @command_splash_window.show
+    #@background_bar.opacity = 255
+    refresh_spacing
+  end
+
+  def hide
+    @actor_command_window.hide
+    @command_help_window.hide
+    @command_splash_window.hide
+    #@background_bar.opacity = 0
+  end
+
+  def refresh_spacing
+    @actor_command_window.refresh_position
+    offset = Graphics.width - @actor_command_window.width
+    @command_help_window.width = offset
+    @command_splash_window.update_command_origin(offset)
   end
 
   def needs_update?
@@ -224,6 +330,56 @@ class BattleUI_Bar
 
   def update
     @command_help_window.update_text
+  end
+
+  def dispose
+    @command_help_window.dispose
+    @actor_command_window.dispose
+    @command_splash_window.dispose
+    @background_bar.dispose
+  end
+
+end
+
+#==============================================================================
+# ■ BattleUI_Button
+#-----------------------------------------------------------------------------
+# Define the actor command buttons on the Battle UI Bar.
+#==============================================================================
+class BattleUI_Button
+
+  def initialize(viewport, name)
+    @button = Sprite.new(viewport)
+    @sprite_name = name.to_s
+    @selected = false
+    refresh_button_image(@sprite_name)
+  end
+
+  def refresh_button_image(name)
+    @sprite_name = name.to_s
+    @selected ? select_button : unselect_button
+  end
+
+  def set_position(index, button_max)
+    padding = Revoked::BattleUI::COMMAND_PADDING
+    offset = (button_max - index) * Revoked::BattleUI::BUTTON_WIDTH
+    space = (button_max - index - 1) * Revoked::BattleUI::COMMAND_SPACING
+    @button.x = Graphics.width - offset - padding - space
+    @button.y = Revoked::BattleUI::COMMAND_Y + padding
+  end
+
+  def select_button
+    @button.bitmap = Cache.battle_ui("selected_#{@sprite_name}")
+    @selected = true
+  end
+
+  def unselect_button
+    @button.bitmap = Cache.battle_ui("off_#{@sprite_name}")
+    @selected = false
+  end
+
+  def dispose
+    @button.dispose
   end
 
 end
@@ -238,6 +394,7 @@ class Window_BattleUI_Help < Window_Base
   def initialize(w)
     super(0, Graphics.height - 68, w, 68)
     self.opacity = 0
+    self.arrows_visible = false
     set_desc("")
   end
 
@@ -260,6 +417,11 @@ class Window_BattleUI_Help < Window_Base
 
 end
 
+#==============================================================================
+# ■ Window_BattleUI_Splash
+#-----------------------------------------------------------------------------
+# A window for the name of the currently selected actor command.
+#==============================================================================
 class Window_BattleUI_Splash < Window_Base
 
   def initialize(offset_x)
