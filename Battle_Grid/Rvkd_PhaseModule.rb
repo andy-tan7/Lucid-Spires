@@ -79,6 +79,9 @@ module Revoked
       return pairs
     end
 
+    #---------------------------------------------------------------------------
+    # Calculate the delay until every member's first turn.
+    #---------------------------------------------------------------------------
     def self.recalculate_initiative_factors(all_members)
       # Order all battlers by agility.
       all_members = all_members.select {|member| member.alive? }
@@ -87,12 +90,12 @@ module Revoked
       low = agilities.min
       diff = agilities.max - low
 
-      # Calculate the relative speeds and return unit-
-      ratios = all_members.collect {|u| [u, 1 - (u.agi - low).to_f / diff] }
-      pairs = {} # Hash key: unit; value: initiative factors
-      ratios.each do |r|
-        spd_factor = (1 + (9 * r[1])).to_i
-        pairs[r[0]] = [r[0].agi, (spd_factor..(2 * spd_factor)).to_a.sample]
+      pairs = {} # Hash key: unit; value: [agility, initiative]
+      # Calculate the speed ratios based on the highest and lowest agility.
+      all_members.each do |unit|
+        spd_ratio = 1 - (unit.agi - low).to_f / diff
+        spd_factor = (1 + (9 * spd_ratio)).to_i
+        pairs[unit] = [unit.agi, (spd_factor..(2 * spd_factor)).to_a.sample]
       end
 
       return pairs
