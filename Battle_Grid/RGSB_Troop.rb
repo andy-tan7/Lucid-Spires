@@ -11,8 +11,8 @@ class Game_Troop
   #---------------------------------------------------------------------------
   def setup_grid_positions(hex_grid)
     members.each do |member|
-      coordinates = Revoked::Grid.troop_battler_coordinates(member)
-      Revoked::Grid.reset_troop_screen_xy(member, coordinates)
+      coordinates = Grid.troop_battler_coordinates(member)
+      Grid.reset_troop_screen_xy(member, coordinates)
 
       containing_tiles = hex_grid.tiles_from_coordinates(coordinates)
       containing_tiles.each {|tile| tile.add_unit(member)}
@@ -34,7 +34,7 @@ class Game_Party
   alias rvkd_hexgrid_gpa_initialize initialize
   def initialize
     rvkd_hexgrid_gpa_initialize
-    @grid_positions = Revoked::Grid::DefaultPositions
+    @grid_positions = Grid::Config::DefaultPositions
   end
   #---------------------------------------------------------------------------
   # Add the given party members to tile objects on the grid.

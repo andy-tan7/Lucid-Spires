@@ -8,7 +8,7 @@ module TSBS
     "Actor_MoveSkill" => [
     [],
     #[:script, "msgbox_p('A')"],
-    [:script, "PhaseTurn.move_command(self)"],
+    [:script, "TurnManager.move_command(self)"],
     #[:script, "msgbox_p(self.name)"],
     [:goto_oripost, 16, 5],
     ],

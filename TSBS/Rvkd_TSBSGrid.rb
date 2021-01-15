@@ -44,8 +44,8 @@ class Game_Battler < Game_BattlerBase
     len = grid_coordinates.size
     avg_r = grid_coordinates.collect{|p| p[0]}.inject{|s,r| s + r}.to_f / len
     avg_c = grid_coordinates.collect{|p| p[1]}.inject{|s,c| s + c}.to_f / len
-    unit_x = Revoked::Grid.position(avg_r, avg_c)[:x]
-    unit_x += Revoked::Grid::UnitXOffset
+    unit_x = Grid.position(avg_r, avg_c)[:x]
+    unit_x += Grid::Config::UnitXOffset
     return unit_x
   end
 
@@ -53,8 +53,8 @@ class Game_Battler < Game_BattlerBase
     len = grid_coordinates.size
     avg_r = grid_coordinates.collect{|p| p[0]}.inject{|s,r| s + r}.to_f / len
     avg_c = grid_coordinates.collect{|p| p[1]}.inject{|s,c| s + c}.to_f / len
-    unit_y = Revoked::Grid.position(avg_r, avg_c)[:y]
-    unit_y += Revoked::Grid::UnitYOffset
+    unit_y = Grid.position(avg_r, avg_c)[:y]
+    unit_y += Grid::Config::UnitYOffset
     return unit_y
   end
 end
@@ -62,14 +62,14 @@ end
 class Game_Actor < Game_Battler
   #override
   def original_x
-    unit_x = Revoked::Grid.position(grid_row, grid_col)[:x]
-    unit_x += Revoked::Grid::UnitXOffset
+    unit_x = Grid.position(grid_row, grid_col)[:x]
+    unit_x += Grid::Config::UnitXOffset
     return unit_x
   end
   #override
   def original_y
-    unit_y = Revoked::Grid.position(grid_row, grid_col)[:y]
-    unit_y += Revoked::Grid::UnitYOffset
+    unit_y = Grid.position(grid_row, grid_col)[:y]
+    unit_y += Grid::Config::UnitYOffset
     return unit_y
   end
 end

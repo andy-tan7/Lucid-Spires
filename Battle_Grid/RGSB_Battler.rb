@@ -55,7 +55,7 @@ class Game_Battler < Game_BattlerBase
   def item_apply(user, item)
     rvkd_phaseturn_gbt_item_apply(user, item)
     if SceneManager.scene_is?(Scene_Battle) && @result.need_refresh_event_bar?
-      PhaseTurn.refresh_revealed_events
+      TurnManager.refresh_revealed_events
     end
   end
   #============================================================================
@@ -110,7 +110,7 @@ class Game_Enemy < Game_Battler
   alias rvkd_hexgrid_gen_die die
   def die
     rvkd_hexgrid_gen_die
-    PhaseTurn.remove_grid_unit(self)
+    TurnManager.remove_grid_unit(self)
   end
 
   #===========================================================================

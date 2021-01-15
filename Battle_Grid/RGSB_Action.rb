@@ -47,10 +47,10 @@ class Game_Action
       targets = [subject]
     else
       # Check for original target(s) in range
-      targets = PhaseTurn.units_in_area(@targeted_grid)
+      targets = TurnManager.units_in_area(@targeted_grid)
       # Re-target if targets are empty and item is retargetable
       if targets.empty? && item.retargetable
-        available_targets = PhaseTurn.units_in_area(@available_grid)
+        available_targets = TurnManager.units_in_area(@available_grid)
         targets = [available_targets.sample] unless available_targets.empty?
       end
     end

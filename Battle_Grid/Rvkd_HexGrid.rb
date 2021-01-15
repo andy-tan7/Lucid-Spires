@@ -39,8 +39,8 @@ class HexGrid
     @tilelist = []
     @grid_arrow = GridArrow.new(@viewport)
 
-    radius_x = Revoked::Grid::RadiusX
-    radius_y = Revoked::Grid::RadiusY
+    radius_x = Grid::Config::RadiusX
+    radius_y = Grid::Config::RadiusY
     (-radius_y..radius_y).each do |row|
       @grid[row] = {}
       left_ind  = row < 0 ? -radius_x - row : -radius_x
@@ -272,7 +272,7 @@ class HexGrid
   def recalculate_area
     return if @area_item.nil? || @sel_area.empty?
     unhighlight_for_area(@sel_area)
-    @sel_area = Revoked::Grid::make_area_tiles(self, get(*@cursor), @area_item)
+    @sel_area = Grid.make_area_tiles(self, get(*@cursor), @area_item)
   end
   #---------------------------------------------------------------------------
   # Prepare the grid to allow the player to select a tile/battler.
@@ -417,7 +417,7 @@ class HexTile
     @select_sprite.opacity = 0
 
     # Place tile sprites.
-    position = Revoked::Grid.position(y_index, x_index)
+    position = Grid.position(y_index, x_index)
     @floor_sprite.x = position[:x]
     @floor_sprite.y = position[:y]
     @floor_sprite.z = 0
@@ -541,11 +541,11 @@ class HexTile
   # Return whether the given mouse coordinates intersect with this tile.
   #---------------------------------------------------------------------------
   def mouse_intersect(mouse_x, mouse_y)
-    x_box = @floor_sprite.x + Revoked::Grid::TileBoxPadLeft
-    box_start = Revoked::Grid::TileYBoxStart
-    box_end = Revoked::Grid::TileYBoxEnd
+    x_box = @floor_sprite.x + Grid::Config::TileBoxPadLeft
+    box_start = Grid::Config::TileYBoxStart
+    box_end = Grid::Config::TileYBoxEnd
 
-    x_range = [x_box, x_box + Revoked::Grid::TileWidth]
+    x_range = [x_box, x_box + Grid::Config::TileWidth]
     y_range = [@floor_sprite.y + box_start, @floor_sprite.y + box_end]
 
     box = [x_range, y_range]
@@ -597,7 +597,7 @@ class GridArrow
   # Update the row,col coordinates of the arrow.
   #---------------------------------------------------------------------------
   def update_position(row, col)
-    pos = Revoked::Grid.position(row, col)
+    pos = Grid.position(row, col)
     self.x = pos[:x]
     self.y = pos[:y]
   end

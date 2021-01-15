@@ -12,7 +12,7 @@ class Spriteset_Battle
   # Create the battle event display with the UI viewport.
   #---------------------------------------------------------------------------
   def create_event_display
-    @event_display = PhaseTurn.create_event_display(@viewport1)
+    @event_display = TurnManager.create_event_display(@viewport1)
     return @event_display
   end
   #---------------------------------------------------------------------------

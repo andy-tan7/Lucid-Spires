@@ -1,9 +1,7 @@
-Rvkd_GridConfig
 Rvkd_TimeSlot
 Rvkd_PhaseModule
 Rvkd_PhaseTurn
 Rvkd_PhaseTurn_Targeting
-Rvkd_EventBar
 RGSB_Spriteset
 RGSB_Troop
 RGSB_Item

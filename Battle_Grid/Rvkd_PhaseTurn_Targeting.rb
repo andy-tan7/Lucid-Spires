@@ -137,20 +137,20 @@ class Window_GridTarget < Window_Command
     @current_item = item
 
     origin = [battler.grid_row, battler.grid_col]
-    interact = Revoked::Grid.make_interact_tiles(@hex_grid, origin, item)
+    interact = Grid.make_interact_tiles(@hex_grid, origin, item)
     available = interact[:available]
     potential = interact[:potential]
-    cursor_t = Revoked::Grid.auto_cursor(@hex_grid, origin, available, item)
-    area = Revoked::Grid.make_area_tiles(@hex_grid, cursor_t, item)
+    cursor_t = Grid.auto_cursor(@hex_grid, origin, available, item)
+    area = Grid.make_area_tiles(@hex_grid, cursor_t, item)
 
     @hex_grid.set_area_item(item)
     @hex_grid.setup_target_selection(cursor_t, available, potential, area)
 
     dummy = Game_Action.new(battler)
     item.is_a?(RPG::Skill) ? dummy.set_skill(item.id) : dummy.set_item(item.id)
-    temp = Revoked::Phase.create_temp_events(battler, dummy)
-    PhaseTurn.indicate_player_selected_event(temp[0])
-    PhaseTurn.indicate_player_selected_next_turn(temp[1])
+    temp = Phase.create_temp_events(battler, dummy)
+    TurnManager.indicate_player_selected_event(temp[0])
+    TurnManager.indicate_player_selected_next_turn(temp[1])
   end
   #---------------------------------------------------------------------------
   # End grid targeting (confirm or cancel)
@@ -158,7 +158,7 @@ class Window_GridTarget < Window_Command
   def finish_target_selection(cancel)
     @hex_grid.finish_target_selection
     @current_item = nil
-    PhaseTurn.cancel_indicated_events if cancel
+    TurnManager.cancel_indicated_events if cancel
   end
   #---------------------------------------------------------------------------
   # Handling Processing for OK and Cancel Etc.
@@ -176,7 +176,7 @@ class Window_GridTarget < Window_Command
     area = @hex_grid.copy_targeted_area
     intersect = @hex_grid.intersect?
     # Determine whether the ability can be used on the target.
-    if Revoked::Grid.target_valid?(@current_item, targets, area) && intersect
+    if Grid.target_valid?(@current_item, targets, area) && intersect
       Sound.play_grid_confirm
       Input.update
       deactivate
