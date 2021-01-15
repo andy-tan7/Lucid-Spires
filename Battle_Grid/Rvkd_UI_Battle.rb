@@ -105,7 +105,6 @@ class Scene_Battle
 
 end
 
-
 #==============================================================================
 # ■ Window_BattleStatus
 #==============================================================================
@@ -116,19 +115,12 @@ class Window_BattleStatus < Window_Selectable
 
 end
 
-
 #==============================================================================
 # ■ Window_ActorCommand
 #-----------------------------------------------------------------------------
 # Override Window_ActorCommand window appearance and behaviour
 #==============================================================================
 class Window_ActorCommand < Window_Command
-
-  # alias rvkd_battleui_actorcommand_initialize initialize
-  # def initialize
-  #   rvkd_battleui_actorcommand_initialize
-  #   self.arrows_visible = false
-  # end
 
   def row_max ; 1 end
   def col_max ; 10 end
@@ -260,12 +252,6 @@ class Window_ActorCommand < Window_Command
   def draw_item(index)
     change_color(normal_color, command_enabled?(index))
   end
-
-  # Override - don't use a hightlighting cursor
-  # def update_cursor
-  #   msgbox_p(cursor_rect)
-  #   cursor_rect.empty
-  # end
 
   def pending_color
     return Color.new(255,255,255,255)
@@ -458,6 +444,7 @@ class Window_BattleSkill < Window_SkillList
     y = vertical_offset
     super(x, y, w, height_calc)
     self.visible = false
+    self.back_opacity = 255
     @help_window = help_window
     @info_viewport = info_viewport
   end
@@ -501,6 +488,7 @@ class Window_BattleItem < Window_ItemList
     y = vertical_offset
     super(x, y, w, height_calc)
     self.visible = false
+    self.back_opacity = 255
     @help_window = help_window
     @info_viewport = info_viewport
   end
@@ -528,6 +516,20 @@ class Window_BattleItem < Window_ItemList
   def refresh
     rvkd_battleui_battleitem_refresh
     refresh_position
+  end
+
+end
+
+#==============================================================================
+# ■ Window_Base
+#==============================================================================
+class Window_Base < Window
+
+  alias rvkd_battleui_window_base_initialize initialize
+  def initialize(x, y, width, height)
+    rvkd_battleui_window_base_initialize(x, y, width, height)
+    self.back_opacity = 255
+    self.opacity = 255
   end
 
 end

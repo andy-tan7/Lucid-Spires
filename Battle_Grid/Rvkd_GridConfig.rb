@@ -70,6 +70,9 @@ module Sound
   def self.play_grid_confirm
     RPG::SE.new("TBS_BATTLE_LIST", 90, 85).play
   end
+  def self.play_grid_flourish
+    RPG::SE.new("cursor select (final confirm)", 100, 85).play
+  end
 end # module Cache
 
 #==============================================================================

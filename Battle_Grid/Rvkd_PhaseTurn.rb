@@ -103,7 +103,6 @@ module PhaseTurn
   end
 
   def self.move_command(actor)
-    msgbox_p(123)
     move_unit(actor, actor.current_action.targeted_grid)
   end
 
