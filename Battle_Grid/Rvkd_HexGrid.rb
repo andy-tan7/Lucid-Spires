@@ -84,7 +84,7 @@ class HexGrid
   #---------------------------------------------------------------------------
   # Set phase to influence grid state - :input, :selection, :idle
   #---------------------------------------------------------------------------
-  def set_phase(phase)
+  def set_mode(phase)
     case phase
     when :input
       @phase = :input
@@ -120,6 +120,7 @@ class HexGrid
       recalculate_area
       cursor_select(get(*@cursor))
       update_adaptive_cursor
+      highlight_selected_unit_events
     end
   end
 
@@ -145,6 +146,7 @@ class HexGrid
           recalculate_area
           cursor_select(get(*@cursor))
           update_adaptive_cursor
+          highlight_selected_unit_events
         end
         break
       end
@@ -300,6 +302,7 @@ class HexGrid
     @sel_available.clear
     @sel_potential.clear
     @sel_movable = all_tiles
+    TurnManager.unhighlight_selected_unit_events
   end
   #---------------------------------------------------------------------------
   # * Sprite changes
@@ -312,6 +315,14 @@ class HexGrid
     tile.deselect_tile
     tile.unlight_area
     @mouse_deselected = true
+    TurnManager.unhighlight_selected_unit_events
+  end
+  def highlight_selected_unit_events
+    i = BattleManager.actor.input.item rescue nil
+    t = get_selected_units
+    a = copy_targeted_area
+    return unless i && Grid.target_valid?(i, t, a)
+    TurnManager.highlight_selected_unit_events(get_selected_units)
   end
   #---------------------------------------------------------------------------
   # Highlighting. Handles both array arguments 't' and a single HexTile 't'.

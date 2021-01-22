@@ -9,7 +9,6 @@
 module TurnManager
   def self.init_members
     @schedule = []
-    @all_battlers = []
     @current_time = 0
     @current_event = nil
     @hex_grid = []
@@ -65,6 +64,17 @@ class << TurnManager
     @schedule.insert(ins_at, event)
   end
 
+  # Change colour of events to show that their units are being targeted.
+  def highlight_selected_unit_events(units)
+    unhighlight_selected_unit_events
+    all_members = $game_troop.members + $game_party.members
+    units.each do |unit|
+      @event_display.highlight_elements(unit) if all_members.include?(unit)
+    end
+  end
+  def unhighlight_selected_unit_events
+    @event_display.unhighlight_elements
+  end
   #---------------------------------------------------------------------------
   # Shift the schedule, retrieve the next upcoming event and update time.
   #---------------------------------------------------------------------------
@@ -332,7 +342,7 @@ class Scene_Battle < Scene_Base
   def post_start
     rvkd_phaseturn_scb_post_start
     $game_party.setup_grid_positions(@hex_grid)
-    @hex_grid.set_phase(:idle)
+    @hex_grid.set_mode(:idle)
 
     test_pos = []
     @hex_grid.all_tiles.each do |tile|
@@ -370,7 +380,7 @@ class Scene_Battle < Scene_Base
   def start_actor_command_selection
     rvkd_phaseturn_scb_sac_selection
     BattleManager.input_start
-    @hex_grid.set_phase(:input)
+    @hex_grid.set_mode(:input)
   end
 
   # overriden to delete original method body.
@@ -542,6 +552,7 @@ class Rvkd_EventDisplay
     dispose_events if @events
     @events = []
     @animated_elements = []
+    @highlighted_elements = []
   end
   #---------------------------------------------------------------------------
   # Create a visual display bar for a unit's turn or action event.
@@ -624,6 +635,22 @@ class Rvkd_EventDisplay
     return @events.find {|ev| ev.event == event }
   end
   #---------------------------------------------------------------------------
+  # Change the colour of an event item to show it being selected / targeted.
+  #---------------------------------------------------------------------------
+  def highlight_elements(unit)
+    @events.each do |event|
+      if event.battler == unit
+        event.highlight
+        @highlighted_elements << event
+      end
+    end
+  end
+
+  def unhighlight_elements
+    @highlighted_elements.each {|element| element.unhighlight}
+    @highlighted_elements.clear
+  end
+  #---------------------------------------------------------------------------
   # Add an element to the list of known currently-moving elements.
   #---------------------------------------------------------------------------
   def anim_track_element(element)
@@ -683,6 +710,7 @@ class Rvkd_EventDisplay_Element
     @move_time = 0
     @revealing = false
     @reveal_time = 0
+    @last_tone = :regular
     # Initialize background sprite
     @shadow_bar = Sprite.new(viewport)
     @shadow_bar.bitmap = Cache.grid_turn("event_bg_long")
@@ -721,6 +749,18 @@ class Rvkd_EventDisplay_Element
     @moving = true
     @move_time = time
   end
+
+  #---------------------------------------------------------------------------
+  # Lighten the item to indicate that it is being selected or targeted.
+  #---------------------------------------------------------------------------
+  def highlight
+    @battler_face.tone = Phase::Config::Bar[:bar_tone][:target]
+    #set_tone(:target, false)
+  end
+  def unhighlight
+    @battler_face.tone = Phase::Config::Bar[:bar_tone][:regular]
+    #set_tone(@last_tone, false)
+  end
   #---------------------------------------------------------------------------
   # Reveal to the player the name of the unknown action item / ability.
   #---------------------------------------------------------------------------
@@ -747,8 +787,9 @@ class Rvkd_EventDisplay_Element
   #---------------------------------------------------------------------------
   # Set the background bar tone.
   #---------------------------------------------------------------------------
-  def set_tone(tone_symbol)
+  def set_tone(tone_symbol, remember_last_tone = true)
     return unless @shadow_bar
+    @last_tone = tone_symbol if remember_last_tone
     @shadow_bar.tone = Phase::Config::Bar[:bar_tone][tone_symbol]
   end
   #---------------------------------------------------------------------------

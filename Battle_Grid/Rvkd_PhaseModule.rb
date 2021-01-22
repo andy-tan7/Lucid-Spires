@@ -46,6 +46,7 @@ module Phase
       :bar_tone => {
         :regular => Tone.new,
         :gold => Tone.new(168, 120, 16, 64),
+        :target => Tone.new(64, 64, 64, 64)
       }
     }
 

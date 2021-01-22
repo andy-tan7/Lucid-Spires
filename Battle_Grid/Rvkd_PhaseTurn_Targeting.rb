@@ -61,7 +61,7 @@ class Scene_Battle < Scene_Base
     @target_window.refresh
     @target_window.show.activate
     @target_window.setup_range(battler, usable_item)
-    @hex_grid.set_phase(:selection)
+    @hex_grid.set_mode(:selection)
   end
   #---------------------------------------------------------------------------
   # Final confirmation of a selected target/pos on the grid for a skill/item.
@@ -74,7 +74,7 @@ class Scene_Battle < Scene_Base
     action.set_initial_targets(@hex_grid.get_selected_units)
     queue_actor_next_turn(BattleManager.actor, action)
     @target_window.finish_target_selection(false)
-    @hex_grid.set_phase(:idle)
+    @hex_grid.set_mode(:idle)
     next_command
   end
   #---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ class Scene_Battle < Scene_Base
     when :item
       @item_window.show.activate
     end
-    @hex_grid.set_phase(:input)
+    @hex_grid.set_mode(:input)
   end
 end # Scene_Battle
 
