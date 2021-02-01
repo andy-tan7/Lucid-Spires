@@ -12,8 +12,10 @@ module Phase
   module Config
 
     PHASE_DURATION = 100
+    PHASE_INSERT_TIME = 65
     INITIAL_TURN_SPAN = 20
     DEFAULT_RESET_TIME = 20
+    PHASE_LABEL = "Phase End"
 
     Bar = {
       :x => 0,
@@ -21,6 +23,7 @@ module Phase
       :bar_init_x => -250,
       :short_bar_offset_x => -152,
       :hidden_bar_offset_x => -116,
+      :event_bar_offset_x => -32,
 
       :time_width => 36,
       :time_font_size => 18,
@@ -46,6 +49,7 @@ module Phase
       :bar_tone => {
         :regular => Tone.new,
         :gold => Tone.new(168, 120, 16, 64),
+        :event => Tone.new(0, 16, 8, 8),
         :target => Tone.new(64, 64, 64, 64)
       }
     }

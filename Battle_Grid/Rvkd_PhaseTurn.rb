@@ -13,6 +13,7 @@ module TurnManager
     @current_event = nil
     @hex_grid = []
     @event_display = nil
+    @phase_shift_event = nil
   end
 end
 
@@ -38,9 +39,21 @@ class << TurnManager
   # Initialize new battle phase
   def start_new_phase(members, reset_timeslots = true)
     if reset_timeslots
+      @current_time = 0
       @schedule = Phase.calc_phase_start_order(members)
+      @phase_shift_event = nil
       start_new_event_display
     end
+  end
+
+  def try_insert_phase_shift_event(time = Phase::Config::PHASE_DURATION)
+    # Reveal the Phase Shift event once the phase nears its end.
+    if @current_time > Phase::Config::PHASE_INSERT_TIME && !@phase_shift_event
+      @phase_shift_event = Rvkd_TimeSlotEvent.new(time, true)
+      insert_timeslot_event(@phase_shift_event)
+      return true
+    end
+    return false
   end
 
   #---------------------------------------------------------------------------
@@ -191,8 +204,8 @@ class << TurnManager
   #---------------------------------------------------------------------------
   # * Add events
   #---------------------------------------------------------------------------
-  def add_display_global_event(index, event)
-    raise "not implemented: add_event"
+  def add_display_global_event(index, event, tone = :regular)
+    @event_display.create_phase_shift_event(event, index)
   end
 
   def add_display_unit_event(index, event, tone = :regular)
@@ -417,10 +430,14 @@ class Scene_Battle < Scene_Base
   def next_command
     event = BattleManager.next_command
     if event
+      telegraph_ability(15) if TurnManager.try_insert_phase_shift_event
       #p(event.time)
       #TurnManager.p_schedule
       case event.type
       when :event
+        if event.phase_shift?
+          TurnManager.start_new_phase($game_party.members + $game_troop.members)
+        end
         #environmental?
       when :turn
         # process inputs
@@ -578,6 +595,11 @@ class Rvkd_EventDisplay
     element = Rvkd_EventDisplay_Element.new(event, @viewport, index, tone)
     add_display_element(element)
   end
+  def create_phase_shift_event(event, index)
+    index ||= Phase.get_insertion_index(event.time, get_times_array)
+    element = Rvkd_EventDisplay_Element.new(event, @viewport, index, :event)
+    add_display_element(element)
+  end
   #---------------------------------------------------------------------------
   # Add a turn display element to the event list.
   #---------------------------------------------------------------------------
@@ -592,7 +614,8 @@ class Rvkd_EventDisplay
   #---------------------------------------------------------------------------
   def remove_display_element(element)
     index = @events.find_index {|ev| ev.event == element }
-    raise "attempt to delete element not in the event list." unless index
+    #raise "attempt to delete element not in the event list." unless index
+    return unless index
 
     @animated_elements.delete(@events[index])
     @events[index].dispose
@@ -735,7 +758,7 @@ class Rvkd_EventDisplay_Element
     @shadow_bar.z = 2
     set_tone(tone)
     # Initialize the battler icon.
-    face_name = @battler.battle_event_bar_face
+    face_name = @battler.battle_event_bar_face rescue ""
     @battler_face = Sprite.new(viewport)
     @battler_face.bitmap = Cache.grid_turn("turn_face" + face_name)
     @battler_face.x = @cur_x + Phase::Config::Bar[:face_x]
@@ -747,7 +770,9 @@ class Rvkd_EventDisplay_Element
     @time_icon_bar.draw_event_icon(event.icon) if event.icon
     # Initialize the name bar for ability names.
     @text_bar = Window_TurnBarName.new(@cur_x, @cur_y)
-    @text_bar.draw_event_name(@action.item.name) if @action && @player_revealed
+    text_bar_name = @action.item.name if @action && @player_revealed
+    text_bar_name = Phase::Config::PHASE_LABEL if @event.phase_shift?
+    @text_bar.draw_event_name(text_bar_name) if text_bar_name
     # Set the item to slide in when created.
     change_index(index)
   end
@@ -815,7 +840,9 @@ class Rvkd_EventDisplay_Element
   def calc_offset_x
     if @event.type == :action
       return @player_revealed ? 0 : Phase::Config::Bar[:hidden_bar_offset_x]
-    elsif @event.type == :turn || @event.type == :event
+    elsif @event.type == :event && @event.phase_shift?
+      return Phase::Config::Bar[:event_bar_offset_x]
+    else # @event.type == :turn
       return Phase::Config::Bar[:short_bar_offset_x]
     end
   end
@@ -873,8 +900,10 @@ class Rvkd_EventDisplay_Element
     @time_icon_bar.y += dy
     @text_bar.x += dx
     @text_bar.y += dy
-    @battler_face.x += dx
-    @battler_face.y += dy
+    if @battler_face
+      @battler_face.x += dx
+      @battler_face.y += dy
+    end
   end
   #---------------------------------------------------------------------------
   # Process entire movement completion

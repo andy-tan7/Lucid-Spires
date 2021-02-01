@@ -8,24 +8,26 @@
 #==============================================================================
 class Rvkd_TimeSlotEvent
   attr_reader :time
-  def initialize(time)
+  attr_reader :battler
+  def initialize(time, phase_shift = false)
     @time = time
+    @phase_shift = phase_shift
   end
   def phase ; timeslot / PhaseTurn::Calc::PHASE_DURATION ; end
   #---------------------------------------------------------------------------
   # * Virtual methods
   #---------------------------------------------------------------------------
-  def subject   ; nil    ; end   # Unit / source associated with the event.
-  def type      ; :event ; end   # Event, Turn, or Action
-  def icon      ; nil    ; end   # Effect icon or action icon
-  def revealed? ; false  ; end   # Whether the player can see the item name.
+  def subject      ; nil    ; end   # Unit / source associated with the event.
+  def type         ; :event ; end   # Event, Turn, or Action
+  def revealed?    ; false  ; end   # Whether the player can see the item name.
+  def phase_shift? ; @phase_shift ; end # Whether this is a phase shift event.
+  def icon ; @phase_shift ? 280 : nil ; end   # Effect icon or action icon
 end # Rvkd_TimeSlotEvent
 
 #=============================================================================
 # ■ Rvkd_TimeSlotTurn
 #=============================================================================
 class Rvkd_TimeSlotTurn < Rvkd_TimeSlotEvent
-  attr_reader :battler
   def initialize(time, battler)
     super(time)
     @battler = battler    # Game_Battler
@@ -41,8 +43,10 @@ class Rvkd_TimeSlotTurn < Rvkd_TimeSlotEvent
   #---------------------------------------------------------------------------
   # * Override methods
   #---------------------------------------------------------------------------
-  def subject ; @battler ; end
-  def type    ; :turn    ; end
+  def subject      ; @battler ; end
+  def type         ; :turn    ; end
+  def icon         ; nil      ; end   # Effect icon or action icon
+  def phase_shift? ; false    ; end
 end # Rvkd_TimeSlotTurn
 
 #=============================================================================
