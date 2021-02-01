@@ -82,8 +82,24 @@ class << TurnManager
     @current_event = @schedule.shift
     return nil if !@current_event
 
-    @current_time = @current_event.time
+    advance_time(@current_event.time)
     return @current_event
+  end
+  #---------------------------------------------------------------------------
+  # Pass a certain amount of phase time. Advances state progression on units.
+  #---------------------------------------------------------------------------
+  def advance_time(time)
+    last_time = @current_time
+    @current_time = time
+
+    elapsed = time - last_time
+    all_members = $game_troop.members + $game_party.members
+    elapsed.times do
+      all_members.each do |u|
+        u.update_state_turns
+        u.remove_states_auto(2)
+      end
+    end
   end
   #---------------------------------------------------------------------------
   # Get an array of units within the set of tiles.
@@ -758,6 +774,7 @@ class Rvkd_EventDisplay_Element
     #set_tone(:target, false)
   end
   def unhighlight
+    return if @battler_face.disposed?
     @battler_face.tone = Phase::Config::Bar[:bar_tone][:regular]
     #set_tone(@last_tone, false)
   end
