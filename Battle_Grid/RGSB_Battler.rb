@@ -3,6 +3,24 @@
 #------------------------------------------------------------------------------
 #  This script defines and implements battler-related fields and functions.
 #==============================================================================
+# ■ Game_BattlerBase
+#==============================================================================
+class Game_BattlerBase
+
+  alias rvkd_phaseturn_gbb_clear_states clear_states
+  def clear_states
+    rvkd_phaseturn_gbb_clear_states
+    @state_phases = {}
+  end
+
+  alias rvkd_phaseturn_gbb_erase_state erase_state
+  def erase_state(state_id)
+    rvkd_phaseturn_gbb_erase_state(state_id)
+    @state_phases.delete(state_id)
+  end
+
+end
+#==============================================================================
 # ■ Game_Battler
 #==============================================================================
 class Game_Battler < Game_BattlerBase
@@ -64,7 +82,26 @@ class Game_Battler < Game_BattlerBase
   def battle_event_bar_face
     return "_" + name
   end
-  #-----------------------------------------------------
+  #----------------------------------------------------------------------------
+  # State timing
+  #----------------------------------------------------------------------------
+  # Call on phase shift to decrement phase expiration states.
+  def update_state_phases
+    states.each {|s| @state_phases[s.id] -= 1 if @state_phases[s.id] > 0 }
+  end
+
+  alias rvkd_phaseturn_gbt_remove_states_auto remove_states_auto
+  def remove_states_auto(timing)
+    rvkd_phaseturn_gbt_remove_states_auto(timing)
+    states.each {|s| remove_state(s.id) if @state_phases[s.id] == 0 }
+  end
+
+  alias rvkd_phaseturn_gbt_reset_state_counts reset_state_counts
+  def reset_state_counts(state_id)
+    rvkd_phaseturn_gbt_reset_state_counts(state_id)
+    @state_phases[state_id] = $data_states[state_id].min_phases
+  end
+
 end
 
 #==============================================================================

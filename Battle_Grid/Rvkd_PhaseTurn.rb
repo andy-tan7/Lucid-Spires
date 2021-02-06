@@ -43,6 +43,13 @@ class << TurnManager
       @schedule = Phase.calc_phase_start_order(members)
       @phase_shift_event = nil
       start_new_event_display
+
+      # Decrement phase-duration states.
+      all_members = $game_troop.members + $game_party.members
+      all_members.each do |u|
+        u.update_state_phases
+        u.remove_states_auto(2)
+      end
     end
   end
 
@@ -95,13 +102,13 @@ class << TurnManager
     @current_event = @schedule.shift
     return nil if !@current_event
 
-    advance_time(@current_event.time)
+    set_current_time(@current_event.time)
     return @current_event
   end
   #---------------------------------------------------------------------------
   # Pass a certain amount of phase time. Advances state progression on units.
   #---------------------------------------------------------------------------
-  def advance_time(time)
+  def set_current_time(time)
     last_time = @current_time
     @current_time = time
 
