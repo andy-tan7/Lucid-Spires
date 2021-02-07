@@ -23,6 +23,7 @@ class << TurnManager
   #---------------------------------------------------------------------------
   def current_time ; return @current_time ; end
   def current_event ; return @current_event ; end
+  def phase_end_time ; @phase_shift_event ? @phase_shift_event.time : -1 ; end
 
   #---------------------------------------------------------------------------
   # * Object Initialization
@@ -63,10 +64,16 @@ class << TurnManager
     return false
   end
 
+  def action_valid?(a)
+    return true if phase_end_time <= 0
+    return @current_time + a.prep_time < phase_end_time && phase_end_time > 0
+  end
   #---------------------------------------------------------------------------
   # * Add an event to both the turn schedule and the event display list.
   #---------------------------------------------------------------------------
   def insert_timeslot_event(event)
+    return if event && event.time > phase_end_time && phase_end_time > 0
+
     insert_schedule_only(event)
     ins_at = 1 if event.time == @current_time
     ins_at ||= Phase.get_insertion_index(event.time,
@@ -77,6 +84,8 @@ class << TurnManager
 
   # Add an event only to the turn schedule.
   def insert_schedule_only(event)
+    return if event && event.time > phase_end_time && phase_end_time > 0
+
     ins_at = 0 if event.time == @current_time
     ins_at ||= Phase.get_insertion_index(event.time,
       @schedule.collect {|e| e.time})
@@ -219,8 +228,8 @@ class << TurnManager
     @event_display.create_unit_event(event, index, tone)
   end
 
-  def remove_display_event(rem_event)
-    @event_display.remove_display_element(rem_event)
+  def remove_display_event(turn)
+    @event_display.remove_display_element(turn.event) if turn
   end
 
   def remove_multiple_events(rem_events)
@@ -230,7 +239,7 @@ class << TurnManager
   # Process completion of the current displayed event.
   #---------------------------------------------------------------------------
   def finish_current_event
-    remove_display_event(@current_event)
+    @event_display.remove_display_element(@current_event)
   end
   #---------------------------------------------------------------------------
   # Keep track of known moving display elements.
@@ -249,7 +258,11 @@ class << TurnManager
     ins_at = event.time == @current_time ? 1 : nil
     ins_at ||= Phase.get_insertion_index(event.time,
       @event_display.get_times_array)
-    @temp_display_action = add_display_unit_event(ins_at, event, :gold)
+    if event && event.time > phase_end_time && phase_end_time > 0
+      @temp_display_action = add_display_unit_event(ins_at, event, :red)
+    else
+      @temp_display_action = add_display_unit_event(ins_at, event, :gold)
+    end
   end
 
   # Demo the player's next turn if they confirm the indicated action.
@@ -257,19 +270,23 @@ class << TurnManager
     ins_at = event.time == @current_time ? 1 : nil
     ins_at ||= Phase.get_insertion_index(event.time,
       @event_display.get_times_array)
-    @temp_display_next_turn = add_display_unit_event(ins_at, event, :gold)
+    if event && event.time > phase_end_time && phase_end_time > 0
+      @temp_display_next_turn = nil
+    else
+      @temp_display_next_turn = add_display_unit_event(ins_at, event, :gold)
+    end
   end
 
   # Remove any temporary demo actions.
   def cancel_indicated_events
-    remove_display_event(@temp_display_action.event)
-    remove_display_event(@temp_display_next_turn.event)
+    remove_display_event(@temp_display_action)
+    remove_display_event(@temp_display_next_turn)
     @temp_display_action = nil
     @temp_display_next_turn = nil
   end
 
   def get_temp_events
-    [@temp_display_action, @temp_display_next_turn]
+    [@temp_display_action, @temp_display_next_turn].compact
   end
   #---------------------------------------------------------------------------
   # Change the background shadow tones for the temp events.
@@ -555,16 +572,16 @@ class Scene_Battle < Scene_Base
     temp = TurnManager.get_temp_events
     TurnManager.set_temp_tone(:regular)
 
-    temp[0].event.set_action(action)
+    temp[0].event.set_action(action) if temp[0]
     # enqueue the action and the unit's next turn.
     # Add the new action to the event chain.
-    TurnManager.insert_schedule_only(temp[0].event)
+    TurnManager.insert_schedule_only(temp[0].event) if temp[0]
     # Display the telegraphed move if enabled -- otherwise just wait frames.
     telegraph_ability
     # Remove the current turn event.
     TurnManager.finish_current_event
     # Add the unit's next turn to the event chain.
-    TurnManager.insert_schedule_only(temp[1].event)
+    TurnManager.insert_schedule_only(temp[1].event) if temp[1]
   end
 end # Scene_Battle
 

@@ -175,8 +175,11 @@ class Window_GridTarget < Window_Command
     targets = @hex_grid.get_selected_units
     area = @hex_grid.copy_targeted_area
     intersect = @hex_grid.intersect?
+    # Determine whether the ability can be completed in time.
+    # If not, the ability cannot be used.
     # Determine whether the ability can be used on the target.
-    if Grid.target_valid?(@current_item, targets, area) && intersect
+    if TurnManager.action_valid?(@current_item) &&
+    Grid.target_valid?(@current_item, targets, area) && intersect
       Sound.play_grid_confirm
       Input.update
       deactivate
